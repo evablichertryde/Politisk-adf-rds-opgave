@@ -1,0 +1,92 @@
+---
+title: "politics clean"
+editor_options: 
+  chunk_output_type: inline
+header-includes:
+    - \usepackage{setspace}\doublespacing
+    - \usepackage{booktabs} 
+    - \usepackage{tabularx}
+    - \usepackage{tidy}
+output:   
+  bookdown::pdf_document2:
+  fig_caption: true
+  fontsize: 10.5pt
+---
+```{r hente-pakker, message=FALSE, include=FALSE, echo=FALSE}
+library(dplyr) # Kan rense det nye data
+library(tidyr)
+library(stringr) # Til arbejde med string-data
+library(ggplot2) # Til visualisering af resultater
+library(viridis)
+library(lubridate)
+library(ggpubr) # Flere plots sammen
+library(openxlsx) # Kan loade og gemme excel
+library(ggpubr)
+library(tidyverse)
+library(haven) # til at åbne datasæt 
+```
+
+
+##åbne data 
+data fra 2018
+```{r åben data, include=FALSE, echo=FALSE}
+ESS18_politics<- read.csv("../tema datasæt/ESS18_politics.csv")
+ESS18_politics <- subset(ESS18_politics, select = -c(X, prtvblt2, prtvblt3, prtvede2))
+```
+
+
+
+```{r}
+party <- subset(ESS18_politics, select = c(prtvtcat:prtvtfsi))
+party <- rowSums(party, na.rm = TRUE)
+ESS18_politics$voteparty <- party
+ESS18_politics <- subset(ESS18_politics, select = -c(prtvtcat:prtvtfsi))
+```
+
+```{r}
+party <- subset(ESS18_politics, select = c(prtcldat:prtcldsk))
+party <- rowSums(party, na.rm = TRUE)
+ESS18_politics$closeparty <- party
+ESS18_politics <- subset(ESS18_politics, select = -c(prtcldat:prtcldsk))
+```
+
+
+trust index 
+bruger variablerne, trstplt, trstprt, trstprl, trstplc, trstlgl
+```{r}
+trust <- subset(ESS18_politics, select = c(idno, trstplt, trstprt, trstprl, trstplc, trstlgl))
+
+
+sum(is.na(trust))
+sum(is.na(trust$trstplt))
+sum(is.na(trust$trstprt))
+sum(is.na(trust$trstprl))
+sum(is.na(trust$trstplc))
+sum(is.na(trust$trstlgl))
+
+unique(trust)
+
+```
+
+
+```{r}
+trust <- trust %>%
+  rowwise()%>%
+  mutate(trust_norris = mean(c(trstplt, trstprt, trstprl, trstplc, trstlgl)), trust_norris_na = sum(is.na(c(trstplt, trstprt, trstprl, trstplc, trstlgl))))
+```
+
+```{r}
+#lave denisity plot over fordeling på trust index
+library(ggplot2)
+
+ggplot(trust, aes(trust_norris))+
+   geom_density()
+
+```
+
+
+
+
+
+
+

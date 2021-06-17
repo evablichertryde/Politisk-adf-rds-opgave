@@ -1,0 +1,61 @@
+---
+title: "Religion"
+output: htlm_notebook
+editor_options: 
+  chunk_output_type: inline
+header-includes:
+    - \usepackage{setspace}\doublespacing
+    - \usepackage{booktabs} 
+    - \usepackage{tabularx}
+    - \usepackage{tidy}
+output:   
+  bookdown::pdf_document2:
+  fig_caption: true
+  fontsize: 10.5pt
+---
+
+## Hente pakker
+
+```{r hente-pakker, message=FALSE, include=FALSE, echo=FALSE}
+library(dplyr) # Kan rense det nye data
+library(tidyr)
+library(stringr) # Til arbejde med string-data
+library(ggplot2) # Til visualisering af resultater
+library(tidyverse) #datoer
+library(haven) # til at åbne datasæt 
+library(Hmisc)
+library(corrr)
+library(xtable)
+library(jtools)
+library(weights)
+library(broom)
+library(purrr)
+```
+
+## Åbne Data
+
+```{r}
+ESS18<- read.csv("../original data/ESS18.csv")
+```
+
+andel som anskuer sig selv som religiøse
+```{r}
+table(ESS18$rlgblg)
+```
+
+6 er islam, hvis religiøs, meget få. 
+```{r}
+table(ESS18$rlgdnm)
+```
+```{r}
+table(ESS18$blgetmg)
+```
+
+```{r}
+table(ESS18$rlgdnme)
+```
+
+```{r}
+table(ESS18$freehms)
+```
+

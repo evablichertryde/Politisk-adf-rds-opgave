@@ -1,0 +1,193 @@
+---
+title: "parti correlation"
+output: htlm_notebook
+editor_options: 
+  chunk_output_type: inline
+header-includes:
+    - \usepackage{setspace}\doublespacing
+    - \usepackage{booktabs} 
+    - \usepackage{tabularx}
+    - \usepackage{tidy}
+output:   
+  bookdown::pdf_document2:
+  fig_caption: true
+  fontsize: 10.5pt
+---
+```{r hente-pakker, message=FALSE, include=FALSE, echo=FALSE}
+library(dplyr) # Kan rense det nye data
+library(tidyr)
+library(stringr) # Til arbejde med string-data
+library(ggplot2) # Til visualisering af resultater
+library(viridis)
+library(lubridate)
+library(ggpubr) # Flere plots sammen
+library(openxlsx) # Kan loade og gemme excel
+library(ggpubr)
+library(tidyverse)
+library(haven) # til at åbne datasæt 
+library(Hmisc)
+library(scales)
+library(corrr)
+library(xtable)
+library(jtools)
+library(weights)
+```
+
+```{r}
+parti <- read.csv("../tema datasæt/parti.csv")
+PVQ<- read.csv("../tema datasæt/PVQ_r.csv")
+weights<- read.csv("../tema datasæt/weights.csv")
+```
+
+```{r}
+parti <- left_join(parti, PVQ, by = "id")
+parti <- left_join(parti, weights, by = "id")
+rm(PVQ, weights)
+```
+
+
+```{r}
+parti$national[parti$cmp_parfam.x %in% c(70)] <- 1
+parti$national[parti$cmp_parfam.x %in% c(10, 20, 30, 40, 50, 60, 80)] <- 0
+parti$national[parti$cmp_parfam.x %in% c(90, 95, 98, 999)] <- NA
+
+parti$konservativ[parti$cmp_parfam.x %in% c(60)] <- 1
+parti$konservativ[parti$cmp_parfam.x %in% c(10, 20, 30, 40, 50, 70, 80)] <- 0
+parti$konservativ[parti$cmp_parfam.x %in% c(90, 95, 98, 999)] <- NA
+
+parti$natkon[parti$cmp_parfam.x %in% c(60, 70)] <- 1
+parti$natkon[parti$cmp_parfam.x %in% c(10, 20, 30, 40, 50, 80)] <- 0
+parti$natkon[parti$cmp_parfam.x %in% c(90, 95, 98, 999)] <- NA
+```
+
+```{r}
+tabl <- function(...) table(..., useNA='ifany')
+```
+
+
+```{r}
+tabl(parti$cntry.y, parti$cmp_parfam.x)
+```
+
+
+```{r}
+data <- parti %>%
+  select(PVQ, Feldman, Norris, anweight, cntry.y, national, konservativ, natkon)
+```
+
+
+```{r}
+data_1 <- gather(data, auto, auto_værdi, PVQ:Norris)%>%
+  gather(parti, parti_værdi, national:natkon)
+data_1 <- na.omit(data_1)
+```
+
+```{r}
+cor_fun1 <- function(df){
+  results <- cor.test(df$auto_værdi, df$parti_værdi, method = "pearson")
+  cbind(results$estimate, results$p.value)
+}
+```
+
+
+```{r, message=FALSE, include=FALSE, echo=FALSE}
+data_all <- data_1 %>%
+  select(auto, auto_værdi, parti, parti_værdi)
+data_nest_all <- group_by(data_all, auto, parti) %>% nest()
+data_nest_all <- mutate(data_nest_all, model = map(data, cor_fun1))
+
+data_all_list <- as.data.frame(matrix(unlist(data_nest_all$model), nrow = length(data_nest_all$model), byrow=TRUE))
+data_all_list <- data_all_list%>%
+  mutate(p.value = round(V2, digits = 6))%>%
+  rename(cor = V1)%>%
+  select(cor, p.value)
+data_nest_all <- cbind(data_nest_all, data_all_list)
+```
+
+
+```{r}
+data_nest_all <- data_nest_all%>%
+  select(-c(model, data))
+data_nest_all$cntry.y <- "all"
+rm(data_all, data_all_list)
+```
+
+```{r, message=FALSE, include=FALSE, echo=FALSE}
+data_cntry <- data_1 %>%
+  select(cntry.y, auto, auto_værdi, parti, parti_værdi)
+data_nest <- group_by(data_cntry, cntry.y, auto, parti) %>% nest()
+data_nest <- mutate(data_nest, model = map(data, cor_fun1))
+
+data_cntry_list <- as.data.frame(matrix(unlist(data_nest$model), nrow = length(data_nest$model), byrow=TRUE))
+data_cntry_list <- data_cntry_list%>%
+  mutate(p.value = round(V2, digits = 6))%>%
+  rename(cor = V1)%>%
+  select(cor, p.value)
+data_nest <- cbind(data_nest, data_cntry_list)
+```
+
+
+```{r}
+data_nest <- data_nest%>%
+  select(-c(model, data))
+rm(data_cntry, data_cntry_list)
+data_cor <- rbind(data_nest_all, data_nest)
+rm(data_nest, data_nest_all)
+```
+
+
+
+```{r}
+lande_fht_all_dir<- function(df){
+
+df$direction[df$parti == "national" & df$cntry.y != "all" & df$cor <= 0] <- FALSE
+df$direction[df$parti == "national" & df$cntry.y != "all" & df$cor > 0] <- TRUE
+
+df$direction[df$parti == "konservativ" & df$cntry.y != "all" & df$cor <= 0] <- FALSE
+df$direction[df$parti == "konservativ" & df$cntry.y != "all" & df$cor > 0] <- TRUE
+
+df$direction[df$parti == "natkon" & df$cntry.y != "all" & df$cor <= 0] <- FALSE
+df$direction[df$parti == "natkon" & df$cntry.y != "all" & df$cor > 0] <- TRUE
+
+return(df)
+}
+
+
+lande_fht_all_sig<- function(df){
+df$sig[df$direction == TRUE & df$cntry.y != "all" & df$p.value <= 0.05] <- TRUE
+df$sig[df$direction == TRUE & df$cntry.y != "all" & df$p.value > 0.05] <- FALSE
+df$sig[df$direction == FALSE] <- FALSE
+
+return(df)
+}
+```
+
+```{r}
+data_cor <- lande_fht_all_dir(data_cor)
+data_cor <- lande_fht_all_sig(data_cor)
+```
+```{r}
+data_cor <- data_cor %>%
+  filter(cor != "NA")
+```
+
+
+### datasæt med retning for lande ift. generelt
+
+```{r}
+aut_dir <- data_cor %>%
+  filter(cntry.y != "all") %>%
+  group_by(auto, parti) %>% 
+  tally(direction)
+
+aut_sig <- data_cor %>%
+  filter(cntry.y != "all") %>%
+  group_by(auto, parti) %>% 
+  tally(sig)
+
+```
+
+```{r}
+
+```
+

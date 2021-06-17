@@ -1,0 +1,460 @@
+---
+title: "index 07.12"
+output: htlm_notebook
+editor_options: 
+  chunk_output_type: inline
+output:   
+  bookdown::pdf_document2:
+  fig_caption: true
+  fontsize: 10.5pt
+---
+
+skal bruges til authoritær index. 
+```{r hente-pakker, message=FALSE, include=FALSE, echo=FALSE}
+library(dplyr) # Kan rense det nye data
+library(tidyr)
+library(stringr) # Til arbejde med string-data
+library(ggplot2) # Til visualisering af resultater
+library(viridis)
+library(lubridate)
+library(ggpubr) # Flere plots sammen
+library(openxlsx) # Kan loade og gemme excel
+library(ggpubr)
+library(tidyverse)
+library(haven) # til at åbne datasæt 
+library(Hmisc)
+library(corrr)
+library(psych)
+library(scales)
+```
+
+
+##åbne data 
+data fra 2018
+```{r åben data, message=FALSE, include=F, echo=FALSE}
+tradtionel_livs_timing <- read.csv("../tema datasæt/tradtionel_livs_timing.csv")
+```
+
+
+#Lave index med de linkert skala variabler - approve variablerne
+```{r}
+likert <- tradtionel_livs_timing%>%
+  select(anvcld:advcyc)
+```
+
+```{r, message=T, include=F}
+psych::alpha(likert)
+
+```
+
+Reliability analysis   
+Call: psych::alpha(x = likert)
+
+  raw_alpha std.alpha G6(smc) average_r S/N    ase mean   sd median_r
+      0.82      0.82    0.82      0.48 4.6 0.0013  3.4 0.84     0.49
+
+ lower alpha upper     95% confidence boundaries
+0.82 0.82 0.82 
+
+ Reliability if an item is dropped:
+        raw_alpha std.alpha G6(smc) average_r S/N alpha se  var.r med.r
+anvcld       0.79      0.79    0.79      0.49 3.9   0.0016 0.0339  0.44
+alvgptn      0.75      0.75    0.70      0.42 3.0   0.0019 0.0078  0.43
+acldnmr      0.75      0.75    0.70      0.43 3.0   0.0019 0.0098  0.43
+aftjbyc      0.84      0.84    0.83      0.57 5.2   0.0013 0.0186  0.51
+advcyc       0.79      0.79    0.79      0.49 3.8   0.0016 0.0396  0.44
+
+ Item statistics 
+            n raw.r std.r r.cor r.drop mean  sd
+anvcld  46124  0.76  0.74  0.64   0.58  3.1 1.2
+alvgptn 46484  0.85  0.85  0.86   0.74  3.6 1.1
+acldnmr 46496  0.84  0.84  0.85   0.73  3.6 1.1
+aftjbyc 46131  0.63  0.63  0.46   0.42  3.5 1.1
+advcyc  43969  0.76  0.75  0.65   0.60  3.1 1.1
+
+Non missing response frequency for each item
+           1    2    3    4    5 miss
+anvcld  0.10 0.18 0.35 0.22 0.15 0.02
+alvgptn 0.04 0.10 0.30 0.34 0.22 0.01
+acldnmr 0.04 0.11 0.29 0.35 0.21 0.01
+aftjbyc 0.04 0.16 0.26 0.35 0.20 0.02
+advcyc  0.07 0.20 0.38 0.23 0.11 0.07
+
+
+
+kan overveje at droppe aftjbyc "Approve if person has full-time job while children aged under 3"
+
+```{r}
+likert$id <- tradtionel_livs_timing$id
+likert <- likert%>%
+  rowwise()%>%
+  mutate(index_approve = mean(c(anvcld, alvgptn, acldnmr, aftjbyc, advcyc)), 
+         NA_number = sum(is.na(c(anvcld, alvgptn, acldnmr, aftjbyc, advcyc))))
+table(likert$NA_number)
+```
+i indekset er 323 observation alle variablerne NA
+jeg dropper de observation hvor alle eller 4 ud af 5 af variablerne er NA
+resten ersattes med observation gennemsnit på de andre variabler
+
+
+
+```{r}
+likert_index1 <- likert %>%
+  filter(NA_number == 1)
+
+likert_index1$anvcld[is.na(likert_index1$anvcld)] <- mean(c(likert_index1$alvgptn, likert_index1$acldnmr, likert_index1$aftjbyc, likert_index1$advcyc), na.rm = TRUE)
+
+likert_index1$alvgptn[is.na(likert_index1$alvgptn)] <- mean(c(likert_index1$anvcld, likert_index1$acldnmr, likert_index1$aftjbyc, likert_index1$advcyc), na.rm = TRUE)
+
+likert_index1$acldnmr[is.na(likert_index1$acldnmr)] <- mean(c(likert_index1$anvcld, likert_index1$alvgptn, likert_index1$aftjbyc, likert_index1$advcyc), na.rm = TRUE)
+
+likert_index1$aftjbyc[is.na(likert_index1$aftjbyc)] <- mean(c(likert_index1$anvcld, likert_index1$alvgptn, likert_index1$acldnmr, likert_index1$advcyc), na.rm = TRUE)
+
+likert_index1$advcyc[is.na(likert_index1$advcyc)] <- mean(c(likert_index1$anvcld, likert_index1$alvgptn, likert_index1$acldnmr, likert_index1$aftjbyc), na.rm = TRUE)
+```
+
+
+```{r}
+likert_index2 <- likert %>%
+  filter(NA_number == 2)
+
+likert_index2$anvcld[is.na(likert_index2$anvcld)] <- mean(c(likert_index2$alvgptn, likert_index2$acldnmr, likert_index2$aftjbyc, likert_index2$advcyc), na.rm = TRUE)
+
+likert_index2$alvgptn[is.na(likert_index2$alvgptn)] <- mean(c(likert_index2$anvcld, likert_index2$acldnmr, likert_index2$aftjbyc, likert_index2$advcyc), na.rm = TRUE)
+
+likert_index2$acldnmr[is.na(likert_index2$acldnmr)] <- mean(c(likert_index2$anvcld, likert_index2$alvgptn, likert_index2$aftjbyc, likert_index2$advcyc), na.rm = TRUE)
+
+likert_index2$aftjbyc[is.na(likert_index2$aftjbyc)] <- mean(c(likert_index2$anvcld, likert_index2$alvgptn, likert_index2$acldnmr, likert_index2$advcyc), na.rm = TRUE)
+
+likert_index2$advcyc[is.na(likert_index2$advcyc)] <- mean(c(likert_index2$anvcld, likert_index2$alvgptn, likert_index2$acldnmr, likert_index2$aftjbyc), na.rm = TRUE)
+```
+
+
+
+```{r}
+likert_index3 <- likert %>%
+  filter(NA_number == 3)
+
+likert_index3$anvcld[is.na(likert_index3$anvcld)] <- mean(c(likert_index3$alvgptn, likert_index3$acldnmr, likert_index3$aftjbyc, likert_index3$advcyc), na.rm = TRUE)
+
+likert_index3$alvgptn[is.na(likert_index3$alvgptn)] <- mean(c(likert_index3$anvcld, likert_index3$acldnmr, likert_index3$aftjbyc, likert_index3$advcyc), na.rm = TRUE)
+
+likert_index3$acldnmr[is.na(likert_index3$acldnmr)] <- mean(c(likert_index3$anvcld, likert_index3$alvgptn, likert_index3$aftjbyc, likert_index3$advcyc), na.rm = TRUE)
+
+likert_index3$aftjbyc[is.na(likert_index3$aftjbyc)] <- mean(c(likert_index3$anvcld, likert_index3$alvgptn, likert_index3$acldnmr, likert_index3$advcyc), na.rm = TRUE)
+
+likert_index3$advcyc[is.na(likert_index3$advcyc)] <- mean(c(likert_index3$anvcld, likert_index3$alvgptn, likert_index3$acldnmr, likert_index3$aftjbyc), na.rm = TRUE)
+```
+
+
+```{r}
+likert$id <- tradtionel_livs_timing$id
+likert_index <- likert%>%
+  filter(NA_number == 0)
+```
+
+
+```{r}
+likert_indexfull <- bind_rows(likert_index, likert_index1, likert_index2, likert_index3)
+```
+
+```{r}
+likert_index <- likert_indexfull %>%
+  rowwise()%>%
+  mutate(index_approve = mean(c(anvcld, alvgptn, acldnmr, aftjbyc, advcyc)))
+
+rm(likert_indexfull, likert_index1, likert_index2, likert_index3)
+
+```
+
+
+#inkludere tradtionel_livs_timing$plnftr, "plan for the future or take each day at a time" i index
+
+```{r}
+likert_10 <- tradtionel_livs_timing%>%
+  select(id, anvcld:plnftr)
+```
+
+
+```{r}
+attach(likert_10)
+likert_10$anvcld <- rescale(likert_10$anvcld, to = c(0,10), from =c(1,5))
+likert_10$alvgptn <- rescale(likert_10$alvgptn, to = c(0,10), from =c(1,5))
+likert_10$acldnmr <- rescale(likert_10$acldnmr, to = c(0,10), from =c(1,5))
+likert_10$aftjbyc <- rescale(likert_10$aftjbyc, to = c(0,10), from =c(1,5))
+likert_10$advcyc <- rescale(likert_10$advcyc, to = c(0,10), from =c(1,5))
+detach(likert_10)
+```
+
+
+
+```{r}
+likert_10 <- likert_10%>%
+  select(anvcld:plnftr)
+```
+  
+
+```{r, message=T, include=T}
+psych::alpha(likert_10)
+#results ses kun hvis skrevet i console 
+```
+
+Some items ( plnftr ) were negatively correlated with the total scale and 
+probably should be reversed.  
+To do this, run the function again with the 'check.keys=TRUE' option
+Reliability analysis   
+Call: psych::alpha(x = likert_10)
+
+  raw_alpha std.alpha G6(smc) average_r S/N   ase mean  sd median_r
+      0.72      0.73    0.76      0.31 2.7 0.002  5.8 1.8     0.37
+
+ lower alpha upper     95% confidence boundaries
+0.71 0.72 0.72 
+
+ Reliability if an item is dropped:
+        raw_alpha std.alpha G6(smc) average_r S/N alpha se var.r med.r
+anvcld       0.65      0.66    0.71      0.28 2.0   0.0026 0.091  0.36
+alvgptn      0.61      0.62    0.62      0.25 1.6   0.0029 0.058  0.33
+acldnmr      0.61      0.62    0.63      0.25 1.6   0.0028 0.060  0.32
+aftjbyc      0.69      0.71    0.75      0.33 2.5   0.0022 0.103  0.49
+advcyc       0.65      0.66    0.71      0.28 2.0   0.0026 0.090  0.32
+plnftr       0.82      0.82    0.82      0.48 4.6   0.0013 0.023  0.49
+
+ Item statistics 
+            n raw.r std.r  r.cor r.drop mean  sd
+anvcld  46122  0.73  0.72  0.643  0.555  5.3 2.9
+alvgptn 46482  0.81  0.82  0.860  0.693  6.5 2.7
+acldnmr 46494  0.81  0.82  0.853  0.686  6.4 2.7
+aftjbyc 46129  0.60  0.61  0.457  0.399  6.3 2.7
+advcyc  43967  0.72  0.73  0.644  0.558  5.3 2.7
+plnftr  46870  0.27  0.22 -0.034 -0.031  5.1 3.0
+Advarselsbesked:
+I psych::alpha(likert_10) :
+  Some items were negatively correlated with the total scale and probably 
+should be reversed.  
+To do this, run the function again with the 'check.keys=TRUE' option
+
+```{r}
+likert_10 <- likert_10 %>%
+  rowwise()%>%
+  mutate(NA_number = sum(is.na(c(anvcld, alvgptn, acldnmr, aftjbyc, advcyc, plnftr))))
+         
+table(likert_10$NA_number)
+```
+
+
+```{r}
+likert_index1 <- likert_10 %>%
+  filter(NA_number == 1)
+
+likert_index1$anvcld[is.na(likert_index1$anvcld)] <- mean(c(likert_index1$alvgptn, likert_index1$acldnmr, likert_index1$aftjbyc, likert_index1$advcyc, likert_index1$plnftr), na.rm = TRUE)
+
+likert_index1$alvgptn[is.na(likert_index1$alvgptn)] <- mean(c(likert_index1$anvcld, likert_index1$acldnmr, likert_index1$aftjbyc, likert_index1$advcyc, likert_index1$plnftr), na.rm = TRUE)
+
+likert_index1$acldnmr[is.na(likert_index1$acldnmr)] <- mean(c(likert_index1$anvcld, likert_index1$alvgptn, likert_index1$aftjbyc, likert_index1$advcyc, likert_index1$plnftr), na.rm = TRUE)
+
+likert_index1$aftjbyc[is.na(likert_index1$aftjbyc)] <- mean(c(likert_index1$anvcld, likert_index1$alvgptn, likert_index1$acldnmr, likert_index1$advcyc, likert_index1$plnftr), na.rm = TRUE)
+
+likert_index1$advcyc[is.na(likert_index1$advcyc)] <- mean(c(likert_index1$anvcld, likert_index1$alvgptn, likert_index1$acldnmr, likert_index1$aftjbyc, likert_index1$plnftr), na.rm = TRUE)
+
+likert_index1$plnftr[is.na(likert_index1$plnftr)] <- mean(c(likert_index1$anvcld, likert_index1$alvgptn, likert_index1$acldnmr, likert_index1$aftjbyc, likert_index1$advcyc), na.rm = TRUE)
+```
+
+
+```{r}
+likert_index2 <- likert_10 %>%
+  filter(NA_number == 2)
+
+likert_index2$anvcld[is.na(likert_index2$anvcld)] <- mean(c(likert_index2$alvgptn, likert_index2$acldnmr, likert_index2$aftjbyc, likert_index2$advcyc, likert_index1$plnftr), na.rm = TRUE)
+
+likert_index2$alvgptn[is.na(likert_index2$alvgptn)] <- mean(c(likert_index2$anvcld, likert_index2$acldnmr, likert_index2$aftjbyc, likert_index2$advcyc, likert_index1$plnftr), na.rm = TRUE)
+
+likert_index2$acldnmr[is.na(likert_index2$acldnmr)] <- mean(c(likert_index2$anvcld, likert_index2$alvgptn, likert_index2$aftjbyc, likert_index2$advcyc, likert_index1$plnftr), na.rm = TRUE)
+
+likert_index2$aftjbyc[is.na(likert_index2$aftjbyc)] <- mean(c(likert_index2$anvcld, likert_index2$alvgptn, likert_index2$acldnmr, likert_index2$advcyc, likert_index1$plnftr), na.rm = TRUE)
+
+likert_index2$advcyc[is.na(likert_index2$advcyc)] <- mean(c(likert_index2$anvcld, likert_index2$alvgptn, likert_index2$acldnmr, likert_index2$aftjbyc, likert_index2$plnftr), na.rm = TRUE)
+
+likert_index2$plnftr[is.na(likert_index2$plnftr)] <- mean(c(likert_index2$anvcld, likert_index2$alvgptn, likert_index2$acldnmr, likert_index2$aftjbyc, likert_index2$advcyc), na.rm = TRUE)
+```
+
+
+
+```{r}
+likert_index3 <- likert_10 %>%
+  filter(NA_number == 3)
+
+likert_index3$anvcld[is.na(likert_index3$anvcld)] <- mean(c(likert_index3$alvgptn, likert_index3$acldnmr, likert_index3$aftjbyc, likert_index3$advcyc, likert_index1$plnftr), na.rm = TRUE)
+
+likert_index3$alvgptn[is.na(likert_index3$alvgptn)] <- mean(c(likert_index3$anvcld, likert_index3$acldnmr, likert_index3$aftjbyc, likert_index3$advcyc, likert_index2$plnftr), na.rm = TRUE)
+
+likert_index3$acldnmr[is.na(likert_index3$acldnmr)] <- mean(c(likert_index3$anvcld, likert_index3$alvgptn, likert_index3$aftjbyc, likert_index3$advcyc, likert_index2$plnftr), na.rm = TRUE)
+
+likert_index3$aftjbyc[is.na(likert_index3$aftjbyc)] <- mean(c(likert_index3$anvcld, likert_index3$alvgptn, likert_index3$acldnmr, likert_index3$advcyc, likert_index2$plnftr), na.rm = TRUE)
+
+likert_index3$advcyc[is.na(likert_index3$advcyc)] <- mean(c(likert_index3$anvcld, likert_index3$alvgptn, likert_index3$acldnmr, likert_index3$aftjbyc, likert_index2$plnftr), na.rm = TRUE)
+
+likert_index3$plnftr[is.na(likert_index3$plnftr)] <- mean(c(likert_index3$anvcld, likert_index3$alvgptn, likert_index3$acldnmr, likert_index3$aftjbyc, likert_index3$advcyc), na.rm = TRUE)
+```
+
+
+```{r}
+likert_10index <- likert_10%>%
+  filter(NA_number == 0)
+```
+
+
+```{r}
+likert_indexfull <- bind_rows(likert_10index, likert_index1, likert_index2, likert_index3)
+```
+
+```{r}
+likert_10index <- likert_indexfull%>%
+  rowwise()%>%
+  mutate(index_approve = mean(c(anvcld, alvgptn, acldnmr, aftjbyc, advcyc, plnftr)))
+```
+
+
+```{r}
+rm(likert_indexfull, likert_index1, likert_index2, likert_index3)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+##alders index
+#08.12.20
+```{r, , message=T, include=F}
+age_df <- tradtionel_livs_timing%>%
+  select(id, ageadlt:towkht)
+```
+
+
+```{r}
+age_alpha <- age_df%>%
+   select(ageadlt:towkht)
+```
+
+Reliability analysis   
+Call: psych::alpha(x = age_alpha)
+
+  raw_alpha std.alpha G6(smc) average_r S/N    ase mean  sd median_r
+      0.65      0.73    0.78      0.16 2.7 0.0023   37 4.4     0.11
+
+ lower alpha upper     95% confidence boundaries
+0.64 0.65 0.65 
+
+ Reliability if an item is dropped:
+        raw_alpha std.alpha G6(smc) average_r S/N alpha se var.r med.r
+ageadlt      0.64      0.72    0.78      0.16 2.6   0.0024 0.029  0.11
+agemage      0.63      0.72    0.77      0.17 2.6   0.0025 0.030  0.13
+ageoage      0.63      0.72    0.78      0.17 2.6   0.0025 0.029  0.13
+iaglptn      0.63      0.70    0.76      0.15 2.4   0.0025 0.026  0.11
+iagmr        0.62      0.69    0.74      0.15 2.2   0.0025 0.022  0.11
+iagpnt       0.62      0.69    0.74      0.15 2.2   0.0025 0.023  0.11
+iagrtr       0.62      0.72    0.77      0.16 2.5   0.0026 0.029  0.11
+tyglvp       0.63      0.70    0.76      0.15 2.4   0.0025 0.026  0.11
+tygmr        0.63      0.70    0.75      0.15 2.3   0.0025 0.023  0.11
+tygpnt       0.63      0.70    0.75      0.15 2.3   0.0025 0.024  0.11
+tygrtr       0.65      0.73    0.78      0.17 2.6   0.0024 0.028  0.12
+tolvpnt      0.67      0.74    0.79      0.18 2.9   0.0022 0.027  0.13
+tochld       0.64      0.73    0.78      0.17 2.7   0.0024 0.030  0.12
+towkht       0.62      0.72    0.78      0.17 2.6   0.0025 0.028  0.11
+
+ Item statistics 
+            n raw.r std.r r.cor r.drop mean  sd
+ageadlt 41420  0.32  0.42 0.333  0.243   21 5.1
+agemage 43565  0.43  0.40 0.321  0.315   43 8.7
+ageoage 42287  0.40  0.38 0.295  0.311   68 8.8
+iaglptn 36477  0.37  0.56 0.525  0.332   23 3.9
+iagmr   39005  0.41  0.65 0.674  0.429   26 3.8
+iagpnt  41157  0.41  0.64 0.660  0.428   27 3.8
+iagrtr  40310  0.36  0.44 0.374  0.375   61 5.3
+tyglvp  39943  0.33  0.55 0.512  0.332   19 2.9
+tygmr   43250  0.35  0.61 0.614  0.378   20 3.3
+tygpnt  43981  0.33  0.57 0.563  0.347   20 3.7
+tygrtr  39164  0.37  0.37 0.289  0.231   52 8.9
+tolvpnt 35418  0.24  0.23 0.095  0.063   29 6.8
+tochld  41279  0.34  0.36 0.251  0.238   46 7.4
+towkht  37354  0.40  0.40 0.318  0.319   62 7.7
+
+
+#standariser i fht. alder 10 percentiel, group by country
+først skal jeg lige koble aldre var og land sammen
+```{r}
+ESS18 <- read.csv("../original data/ESS18.csv")
+```
+
+```{r}
+ESS18 <- subset(ESS18, select = c(id, cntry))
+```
+
+```{r}
+age_df <- left_join(age_df, ESS18)
+```
+
+alder ideal at få børn, procentfordeling ift. respondenter fra samme land. 
+```{r}
+library(heatmaply)
+kids_ideal <- age_df%>%
+  group_by(cntry)%>%
+  mutate(procent_ideal_alder_børn_land = percentize(iagpnt))%>%
+  ungroup
+```
+
+
+```{r}
+korrelation_var_aut <- ESS18
+```
+
+
+```{r}
+kids_ideal <- kids_ideal%>%
+  select(c(id, procent_ideal_alder_børn_land))
+```
+
+```{r}
+korrelation_var_aut <- full_join(korrelation_var_aut, kids_ideal)
+```
+
+
+```{r}
+likert_index <- likert_index%>%
+  select(id, index_approve)
+```
+
+```{r}
+korrelation_var_aut <- left_join(korrelation_var_aut, likert_index)
+```
+
+```{r}
+add <- tradtionel_livs_timing%>%
+  select(id, plnftr)
+```
+
+
+```{r}
+korrelation_var_aut <- left_join(korrelation_var_aut, add)
+```
+
+
+```{r}
+write.csv(korrelation_var_aut, file = "../tema datasæt/korrelation_var_aut.csv")
+rm(list = ls())
+```
+
+
+

@@ -1,0 +1,980 @@
+---
+title: "control variables"
+output: htlm_notebook
+editor_options: 
+  chunk_output_type: inline
+header-includes:
+    - \usepackage{setspace}\doublespacing
+    - \usepackage{booktabs} 
+    - \usepackage{tabularx}
+    - \usepackage{tidy}
+output:   
+  bookdown::pdf_document2:
+  fig_caption: true
+  fontsize: 10.5pt
+---
+```{r hente-pakker, message=FALSE, include=FALSE, echo=FALSE}
+library(dplyr) # Kan rense det nye data
+library(tidyr)
+library(stringr) # Til arbejde med string-data
+library(ggplot2) # Til visualisering af resultater
+library(viridis)
+library(lubridate)
+library(ggpubr) # Flere plots sammen
+library(openxlsx) # Kan loade og gemme excel
+library(ggpubr)
+library(tidyverse)
+library(haven) # til at åbne datasæt 
+library(Hmisc)
+library(scales)
+library(corrr)
+library(xtable)
+```
+
+
+##åbne data 
+data fra 2018
+```{r åben data, include=FALSE, echo=FALSE}
+ESS18_demografi<- read.csv("../tema datasæt/ESS18_sociademo.csv")
+```
+
+```{r education norris}
+str(ESS18_demografi$eisced)
+unique(ESS18_demografi$eisced)
+```
+
+
+```{r education norris}
+ESS18_demografi$eisced[ESS18_demografi$eisced == 55] <- NA
+#omkode other til NA
+unique(ESS18_demografi$eisced)
+Hmisc::label(ESS18_demografi$eisced) <- "uddanelsesniveau, 1-7"
+```
+
+##Arbejdsløsheds variable i Norris
+se s. 487
+uemp3m: været arbejdsløs indenfor de sidste 3 månender
+uemp12m: været arbejdsløs indenfor de sidste 12 månender
+
+```{r}
+unique(ESS18_demografi$uemp3m)
+unique(ESS18_demografi$uemp12m)
+
+#omkodes til faktorvariable, så nej er referent kategori (0, nu 2)
+```
+```{r}
+attach(ESS18_demografi)
+ESS18_demografi$uemp3m[ESS18_demografi$uemp3m == 2] <- "nej"
+ESS18_demografi$uemp3m[ESS18_demografi$uemp3m == 1] <- "ja"
+
+ESS18_demografi$uemp12m[ESS18_demografi$uemp12m == 2] <- "nej"
+ESS18_demografi$uemp12m[ESS18_demografi$uemp12m == 1] <- "ja"
+detach(ESS18_demografi)
+
+#hvis svaret er nej til arbejdsløs er svaret til 12 måneder NA, dette ændre jeg til nej
+attach(ESS18_demografi)
+ESS18_demografi$uemp12m[ESS18_demografi$uemp3m == "nej"] <- "nej"
+detach(ESS18_demografi)
+```
+
+
+```{r}
+ESS18_demografi <- ESS18_demografi %>%
+  mutate(uemp3m = as.factor(uemp3m), uemp12m = as.factor(uemp12m))
+
+ESS18_demografi <- ESS18_demografi %>%
+  mutate(uemp3m = fct_relevel(uemp3m, "nej"), uemp12m = fct_relevel(uemp12m, "nej"))
+
+Hmisc::label(ESS18_demografi$uemp3m) <- "arbejdsløshed de sidste 3 måneder"
+Hmisc::label(ESS18_demografi$uemp12m) <- "arbejdsløshed de sidste 12 måneder"
+```
+
+
+
+5 og 6 betyder man er på overførelseindkomst, kommer den om til overførelse indkomst er 1, andre er 0 (reference kategori), ligesom norris.
+nu variable hedder Hincsrca (NORRIS)
+```{r hovedindkomst}
+ESS18_demografi$Hincsrca[ESS18_demografi$hincsrca == 5 | ESS18_demografi$hincsrca == 6] <- 1
+ESS18_demografi$Hincsrca[ESS18_demografi$hincsrca < 5 | ESS18_demografi$hincsrca == 7] <- 0
+
+#skal være en faktor var
+ESS18_demografi <- ESS18_demografi %>%
+  mutate(Hincsrca = as.factor(Hincsrca))
+Hmisc::label(ESS18_demografi$Hincsrca) <- "overførelsesindkomst som hovedindkomst"
+```
+
+```{r økonomisk usikkerhed}
+unique(ESS18_demografi$hincfel)
+#intet behov for a ændre noget 
+Hmisc::label(ESS18_demografi$hincfel) <- "personlig økonomisk usikkerhed, skala 1-4"
+```
+
+```{r indkomst niveau}
+unique(ESS18_demografi$hinctnta)
+#skaleret fra 1-10 percitiel i det land man bor i 
+table(ESS18_demografi$hinctnta)
+#der skal ikke ændre i den 
+Hmisc::label(ESS18_demografi$hinctnta) <- "indkomstsniveau, 1-10 percentil"
+```
+
+```{r urbanization}
+unique(ESS18_demografi$domicil)
+#intet behov for a ændre noget 
+Hmisc::label(ESS18_demografi$domicil) <- "Urbaniseringsgrad, 1-5, 5 stor by"
+```
+
+-----------
+
+### Gender datasæt
+```{r åben data, include=FALSE, echo=FALSE}
+ESS18_gender<- read.csv("../tema datasæt/ESS18_gender.csv")
+```
+
+```{r kønsvariable}
+unique(ESS18_gender$gndr)
+```
+lige nu er køn kodet så 1:male, 2:female, omkoder som female er refernet kategori (0), og er en faktor 
+jeg antager der er større chance for mænd er auth end kvinder, derfor vigtigt at have med som kontrol var.
+
+```{r}
+attach(ESS18_gender)
+ESS18_gender$sex[ESS18_gender$gndr == 2] <- "Female"
+ESS18_gender$sex[ESS18_gender$gndr == 1] <- "Male"
+detach(ESS18_gender)
+unique(ESS18_gender$sex)
+```
+
+
+```{r}
+ESS18_gender <- ESS18_gender %>%
+  mutate(sex = as.factor(sex))
+
+ESS18_gender <- ESS18_gender %>%
+  mutate(sex = fct_relevel(sex, "Female"))
+Hmisc::label(ESS18_gender$sex) <- "køn"
+```
+
+
+```{r alders variable}
+unique(ESS18_gender$agea)
+#ingen NA, derfor ikke brug for at omkode. 
+Hmisc::label(ESS18_gender$agea) <- "alder"
+```
+
+### ESS18_wellbeing datasæt
+```{r åben data, include=FALSE, echo=FALSE}
+ESS18_wellbeing<- read.csv("../tema datasæt/ESS18_wellbeing.csv")
+```
+
+religion vigtighed
+```{r religion vigtighed}
+unique(ESS18_wellbeing$rlgdgr)
+#intet behov for at ændre noget 
+Hmisc::label(ESS18_wellbeing$rlgdgr) <- "vigtighed af religion, 1-10"
+```
+```{r}
+unique(ESS18_wellbeing$rlgdnm)
+attach(ESS18_wellbeing)
+ESS18_wellbeing$rlgdnm[ESS18_wellbeing$rlgdnm %in% c(1, 2, 3, 4)] <- "Kristen"
+ESS18_wellbeing$rlgdnm[ESS18_wellbeing$rlgdnm == 5] <- "Jøde"
+ESS18_wellbeing$rlgdnm[ESS18_wellbeing$rlgdnm == 6] <- "Islam"
+ESS18_wellbeing$rlgdnm[ESS18_wellbeing$rlgdnm %in% c(7, 8)] <- "NA"
+detach(ESS18_wellbeing)
+Hmisc::label(ESS18_wellbeing$rlgdnm) <- "Religion"
+```
+
+
+```{r}
+#intet behov for at ændre noget 
+Hmisc::label(ESS18_wellbeing$rlgdgr) <- "vigtighed af religion, 1-10"
+```
+
+
+
+```{r}
+ESS18_wellbeing$inborn = ESS18_wellbeing$brncntr -1 #individual born i landet, 0: født, 1: ikke født i landet
+ESS18_wellbeing$moborn = ESS18_wellbeing$mocntr -1 #mor born i landet, 0: født, 1: ikke født i landet
+ESS18_wellbeing$faborn = ESS18_wellbeing$facntr -1 #far born i landet, 0: født, 1: ikke født i landet
+
+indvandre <- ESS18_wellbeing %>%
+  select(moborn, faborn)
+
+indvandre$mofa <- rowSums(indvandre, na.rm=TRUE)
+indvandre$idno <- ESS18_wellbeing$idno
+indvandre$inborn <- ESS18_wellbeing$inborn
+```
+
+
+går efter DST definition af indvandre og efterkommer, dog uden at have statsborgerskab af forældre. 
+
+```{r indvandre variable, include=FALSE, echo=FALSE}
+
+attach(indvandre)
+indvandre$indvandre[(indvandre$mofa == 2 & indvandre$inborn == 0) 
+                    | (indvandre$moborn == 1 & indvandre$faborn == "NA" & indvandre$inborn ==0) 
+                    | (indvandre$moborn == "NA" & indvandre$faborn == 1 & indvandre$inborn ==0)] = "Efterkommer"
+
+indvandre$indvandre[(indvandre$mofa == 0) #begge forældre født i landet
+                    | (indvandre$moborn == 1 & indvandre$faborn == 0 & indvandre$inborn ==0) #far + respondent født i landet
+                    | (indvandre$moborn == 0 & indvandre$faborn == 1 & indvandre$inborn ==0) #mor + respondent født i landet
+                    | (indvandre$moborn == 1 & indvandre$faborn == 0 & indvandre$inborn ==1) #far født i landet
+                    | (indvandre$moborn == 0 & indvandre$faborn == 1 & indvandre$inborn ==1) #mor født i landet
+                    | (indvandre$moborn == "NA" & indvandre$faborn == 0 & indvandre$inborn ==0)  #far + respondent født i landet
+                    | (indvandre$moborn == 0 & indvandre$faborn == "NA" & indvandre$inborn ==0)]  = "Oprindelig"
+
+indvandre$indvandre[(indvandre$mofa == 2 & indvandre$inborn == 1) 
+                    | (indvandre$moborn == 1 & indvandre$faborn == "NA" & indvandre$inborn ==1) 
+                    | (indvandre$moborn == "NA" & indvandre$faborn == 1 & indvandre$inborn ==1)] = "Indvandre"
+detach(indvandre)
+
+#skal være en faktor variable
+indvandre$indvandre <- as.factor(indvandre$indvandre)
+indvandre$indvandre <- fct_relevel(indvandre$indvandre, "Oprindelig", "Efterkommer", "Indvandre")
+```
+
+```{r}
+table(ESS18_wellbeing$blgetmg)
+table(indvandre$indvandre)
+```
+
+
+```{r}
+attach(ESS18_wellbeing)
+ESS18_wellbeing$Ethnic[ESS18_wellbeing$blgetmg == 2] <- "majoritet"
+ESS18_wellbeing$Ethnic[ESS18_wellbeing$blgetmg == 1] <- "minoritet"
+detach(ESS18_wellbeing)
+ESS18_wellbeing$Ethnic <- as.factor(ESS18_wellbeing$Ethnic)
+ESS18_wellbeing$Ethnic <- fct_relevel(ESS18_wellbeing$Ethnic, c("majoritet", "minoritet"))
+str(ESS18_wellbeing$Ethnic)
+```
+
+
+tilføje labels
+```{r labels }
+Hmisc::label(ESS18_wellbeing$Ethnic) <- "en del af minoritet"
+Hmisc::label(indvandre$indvandre) <- "nationalitet status"
+
+```
+
+
+```{r}
+politics <- read.csv("../tema datasæt/ESS18_politics.csv")
+```
+
+```{r}
+unique(politics$stfeco)
+Hmisc::label(politics$stfeco) <- "national økonomi"
+```
+
+
+tilføje til kontrolvariable dataset
+
+```{r skabe datasæt med relevante kontrol varaibler}
+ESS18_control <- subset(ESS18_demografi, select =  c(id, eisced, uemp3m, uemp12m, Hincsrca, hincfel, hinctnta, domicil))
+ESS18_control$sex <- ESS18_gender$sex
+ESS18_control$agea <- ESS18_gender$agea
+ESS18_control$rlgdgr <- ESS18_wellbeing$rlgdgr
+ESS18_control$rlgdnm <- ESS18_wellbeing$rlgdnm
+ESS18_control$indvandre <- indvandre$indvandre
+ESS18_control$Ethnic <- ESS18_wellbeing$Ethnic
+ESS18_control$stfeco <- politics$stfeco
+write.csv(ESS18_control, file = ("../tema datasæt/ESS18_control.csv"))
+```
+
+
+#end
+
+------------------------
+
+
+
+```{r}
+parti <- read.csv("../tema datasæt/parti.csv")
+```
+
+```{r}
+parti$parti_dik_national[parti$cmp_parfam.x %in% c(60, 70)] <- 1
+parti$parti_dik_national[parti$cmp_parfam.x %in% c(10, 20, 30, 40, 50, 80)] <- 0
+parti$parti_dik_national[parti$cmp_parfam.x %in% c(90, 95, 98, 999)] <- NA
+```
+
+```{r}
+parti <- full_join(parti, PVQ)
+```
+
+datasæt kun for kristen 
+```{r}
+ESS18_control_k <- ESS18_control
+```
+
+
+```{r}
+parti_c <- parti %>%
+  select(parti_dik_national, id)
+ESS18_control_k <- full_join(ESS18_control_k, parti_c)
+ESS18_control_k <- ESS18_control_k%>%
+  filter(rlgdnm == "Kristen")
+```
+
+```{r, include=FALSE, echo=FALSE, message=F}
+ESS18_control <- ESS18_control %>%
+  group_by(cntry)%>%
+  mutate(udd.corPVQ <-correlate(PVQ, eisced))%>%
+  ungroup
+ESS18_control <- ESS18_control %>%
+  rename(udd.corPVQ = x)%>%
+  select(subset = -c(term))
+```
+
+
+```{r, include=FALSE, echo=FALSE, message=F}
+ESS18_control <- ESS18_control %>%
+  mutate(indvandre_num = scales::rescale(as.numeric(indvandre), to = c(0,10)))
+ESS18_control <- ESS18_control %>%
+  mutate(indvandre.corPVQ <- correlate(PVQ, indvandre_num, method = "spearman"))
+ESS18_control <- ESS18_control %>%
+  rename(indvandre.corPVQ = x)%>%
+  select(subset = -c(term))
+ESS18_control <- ESS18_control %>%
+  group_by(cntry)%>%
+  mutate(indvandre_c.corPVQ <-correlate(PVQ, indvandre_num, method = "spearman"))%>%
+  ungroup
+ESS18_control <- ESS18_control %>%
+  rename(indvandre_c.corPVQ = x)%>%
+  select(subset = -c(term))
+```
+
+
+```{r, include=FALSE, echo=FALSE, message=F}
+ESS18_control <- ESS18_control %>%
+  mutate(Ethnic_num = scales::rescale(as.numeric(Ethnic), to = c(0,10)))
+ESS18_control <- ESS18_control %>%
+  mutate(Ethnic_num.corPVQ <- correlate(PVQ, Ethnic_num, method = "spearman"))
+ESS18_control <- ESS18_control %>%
+  rename(Ethnic_num.corPVQ = x)%>%
+  select(subset = -c(term))
+ESS18_control <- ESS18_control %>%
+  group_by(cntry)%>%
+  mutate(Ethnic_num.corPVQ <-correlate(PVQ, Ethnic_num, method = "spearman"))%>%
+  ungroup
+ESS18_control <- ESS18_control %>%
+  rename(Ethnic_num_c.corPVQ = x)%>%
+  select(subset = -c(term))
+
+ESS18_control <- ESS18_control %>%
+  mutate(rel.corPVQ <- correlate(PVQ, rlgdgr))
+ESS18_control <- ESS18_control %>%
+  rename(rel.corPVQ = x)%>%
+  select(subset = -c(term))
+ESS18_control <- ESS18_control %>%
+  group_by(cntry)%>%
+  mutate(rel_c.corPVQ <-correlate(PVQ, rlgdgr))%>%
+  ungroup
+ESS18_control <- ESS18_control %>%
+  rename(rel_c.corPVQ = x)%>%
+  select(subset = -c(term))
+```
+
+
+```{r, include=FALSE, echo=FALSE, message=F}
+
+ESS18_control <- ESS18_control %>%
+  mutate(sex_num = scales::rescale(as.numeric(sex), to = c(0,10)))
+ESS18_control <- ESS18_control %>%
+  mutate(sex.corPVQ <- correlate(PVQ, sex_num, method = "spearman"))
+ESS18_control <- ESS18_control %>%
+  rename(sex.corPVQ = x)%>%
+  select(subset = -c(term))
+ESS18_control <- ESS18_control %>%
+  group_by(cntry)%>%
+  mutate(sex.corPVQ <-correlate(PVQ, sex_num, method = "spearman"))%>%
+  ungroup
+ESS18_control <- ESS18_control %>%
+  rename(sex_c.corPVQ = x)%>%
+  select(subset = -c(term))
+```
+
+
+
+indkomst niveau 
+```{r, include=FALSE, echo=FALSE, message=F}
+ESS18_control <- ESS18_control %>%
+  mutate(indkomst_niveau.corPVQ <- correlate(PVQ, hinctnta))
+ESS18_control <- ESS18_control %>%
+  rename(indkomst_niveau.corPVQ = x)%>%
+  select(subset = -c(term))
+ESS18_control <- ESS18_control %>%
+  group_by(cntry)%>%
+  mutate(indkomst_niveau_c.corPVQ <-correlate(PVQ, hinctnta))%>%
+  ungroup
+ESS18_control <- ESS18_control %>%
+  rename(indkomst_niveau_c.corPVQ = x)%>%
+  select(subset = -c(term))
+```
+
+arbejdsløshed sidste 3 og 12 måneder 
+```{r, include=FALSE, echo=FALSE, message=F}
+ESS18_control <- ESS18_control %>%
+  mutate(uemp3m_num = scales::rescale(as.numeric(uemp3m), to = c(0,10)))
+ESS18_control <- ESS18_control %>%
+  mutate(uemp3m.corPVQ <- correlate(PVQ, uemp3m_num, method = "spearman"))
+ESS18_control <- ESS18_control %>%
+  rename(uemp3m.corPVQ = x)%>%
+  select(subset = -c(term))
+ESS18_control <- ESS18_control %>%
+  group_by(cntry)%>%
+  mutate(uemp3m.corPVQ <-correlate(PVQ, uemp3m_num, method = "spearman"))%>%
+  ungroup
+ESS18_control <- ESS18_control %>%
+  rename(uemp3m_c.corPVQ = x)%>%
+  select(subset = -c(term))
+
+ESS18_control <- ESS18_control %>%
+  mutate(uemp12m_num = scales::rescale(as.numeric(uemp12m), to = c(0,10)))
+ESS18_control <- ESS18_control %>%
+  mutate(uemp12m.corPVQ <- correlate(PVQ, uemp12m_num, method = "spearman"))
+ESS18_control <- ESS18_control %>%
+  rename(uemp12m.corPVQ = x)%>%
+  select(subset = -c(term))
+ESS18_control <- ESS18_control %>%
+  group_by(cntry)%>%
+  mutate(uemp12m.corPVQ <-correlate(PVQ, uemp12m_num, method = "spearman"))%>%
+  ungroup
+ESS18_control <- ESS18_control %>%
+  rename(uemp12m_c.corPVQ = x)%>%
+  select(subset = -c(term))
+```
+
+økonomiske usikkerhed
+```{r, include=FALSE, echo=FALSE, message=F}
+ESS18_control <- ESS18_control %>%
+  mutate(hincfel_10 = scales::rescale(as.numeric(hincfel), to = c(0,10)))
+ESS18_control <- ESS18_control %>%
+  mutate(hincfel.corPVQ <- correlate(PVQ, hincfel_10, method = "spearman"))
+ESS18_control <- ESS18_control %>%
+  rename(hincfel.corPVQ = x)%>%
+  select(subset = -c(term))
+ESS18_control <- ESS18_control %>%
+  group_by(cntry)%>%
+  mutate(hincfel.corPVQ <-correlate(PVQ, hincfel_10, method = "spearman"))%>%
+  ungroup
+ESS18_control <- ESS18_control %>%
+  rename(hincfel_c.corPVQ = x)%>%
+  select(subset = -c(term))
+```
+
+
+
+```{r, include=FALSE, echo=FALSE, message=F}
+#parti <- parti %>%
+ # mutate(parti_dik_national_10 = rescale(as.numeric(parti_dik_national), to = c(0,10)))
+parti <- parti %>%
+  mutate(parti_dik_national.corPVQ <- correlate(PVQ, parti_dik_national, method = "spearman"))
+parti <- parti %>%
+  rename(parti_dik_national.corPVQ = x)%>%
+  select(subset = -c(term))
+parti <- parti %>%
+  group_by(cntry)%>%
+  mutate(parti_dik_national.corPVQ <-correlate(PVQ, parti_dik_national, method = "spearman"))%>%
+  ungroup
+parti <- parti %>%
+  rename(parti_dik_national_c.corPVQ = x)%>%
+  select(subset = -c(term))
+```
+
+
+med norris
+
+```{r, include=FALSE, echo=FALSE, message=F}
+ESS18_control <- ESS18_control %>%
+  group_by(cntry)%>%
+  mutate(udd.corN <-correlate(Norris, eisced))%>%
+  ungroup
+ESS18_control <- ESS18_control %>%
+  rename(udd.corN = x)%>%
+  select(subset = -c(term))
+```
+
+
+```{r, include=FALSE, echo=FALSE, message=F}
+ESS18_control <- ESS18_control %>%
+  mutate(indvandre_num = scales::rescale(as.numeric(indvandre), to = c(0,10)))
+ESS18_control <- ESS18_control %>%
+  mutate(indvandre.corN <- correlate(Norris, indvandre_num, method = "spearman"))
+ESS18_control <- ESS18_control %>%
+  rename(indvandre.corN = x)%>%
+  select(subset = -c(term))
+ESS18_control <- ESS18_control %>%
+  group_by(cntry)%>%
+  mutate(indvandre_c.corN <-correlate(Norris, indvandre_num, method = "spearman"))%>%
+  ungroup
+ESS18_control <- ESS18_control %>%
+  rename(indvandre_c.corN = x)%>%
+  select(subset = -c(term))
+```
+
+
+```{r, include=FALSE, echo=FALSE, message=F}
+ESS18_control <- ESS18_control %>%
+  mutate(Ethnic_num = scales::rescale(as.numeric(Ethnic), to = c(0,10)))
+ESS18_control <- ESS18_control %>%
+  mutate(Ethnic_num.corN <- correlate(Norris, Ethnic_num, method = "spearman"))
+ESS18_control <- ESS18_control %>%
+  rename(Ethnic_num.corN = x)%>%
+  select(subset = -c(term))
+ESS18_control <- ESS18_control %>%
+  group_by(cntry)%>%
+  mutate(Ethnic_num.corN <-correlate(Norris, Ethnic_num, method = "spearman"))%>%
+  ungroup
+ESS18_control <- ESS18_control %>%
+  rename(Ethnic_num_c.corN = x)%>%
+  select(subset = -c(term))
+
+ESS18_control <- ESS18_control %>%
+  mutate(rel.corN <- correlate(Norris, rlgdgr))
+ESS18_control <- ESS18_control %>%
+  rename(rel.corN = x)%>%
+  select(subset = -c(term))
+ESS18_control <- ESS18_control %>%
+  group_by(cntry)%>%
+  mutate(rel_c.corN <-correlate(Norris, rlgdgr))%>%
+  ungroup
+ESS18_control <- ESS18_control %>%
+  rename(rel_c.corN = x)%>%
+  select(subset = -c(term))
+```
+
+
+```{r, include=FALSE, echo=FALSE, message=F}
+
+ESS18_control <- ESS18_control %>%
+  mutate(sex_num = scales::rescale(as.numeric(sex), to = c(0,10)))
+ESS18_control <- ESS18_control %>%
+  mutate(sex.corN <- correlate(Norris, sex_num, method = "spearman"))
+ESS18_control <- ESS18_control %>%
+  rename(sex.corN = x)%>%
+  select(subset = -c(term))
+ESS18_control <- ESS18_control %>%
+  group_by(cntry)%>%
+  mutate(sex.corN <-correlate(Norris, sex_num, method = "spearman"))%>%
+  ungroup
+ESS18_control <- ESS18_control %>%
+  rename(sex_c.corN = x)%>%
+  select(subset = -c(term))
+```
+
+
+
+indkomst niveau 
+```{r, include=FALSE, echo=FALSE, message=F}
+ESS18_control <- ESS18_control %>%
+  mutate(indkomst_niveau.corN <- correlate(Norris, hinctnta))
+ESS18_control <- ESS18_control %>%
+  rename(indkomst_niveau.corN = x)%>%
+  select(subset = -c(term))
+ESS18_control <- ESS18_control %>%
+  group_by(cntry)%>%
+  mutate(indkomst_niveau_c.corN <-correlate(Norris, hinctnta))%>%
+  ungroup
+ESS18_control <- ESS18_control %>%
+  rename(indkomst_niveau_c.corN = x)%>%
+  select(subset = -c(term))
+```
+
+arbejdsløshed sidste 3 og 12 måneder 
+```{r, include=FALSE, echo=FALSE, message=F}
+ESS18_control <- ESS18_control %>%
+  mutate(uemp3m_num = scales::rescale(as.numeric(uemp3m), to = c(0,10)))
+ESS18_control <- ESS18_control %>%
+  mutate(uemp3m.corN <- correlate(Norris, uemp3m_num, method = "spearman"))
+ESS18_control <- ESS18_control %>%
+  rename(uemp3m.corN = x)%>%
+  select(subset = -c(term))
+ESS18_control <- ESS18_control %>%
+  group_by(cntry)%>%
+  mutate(uemp3m.corN <-correlate(Norris, uemp3m_num, method = "spearman"))%>%
+  ungroup
+ESS18_control <- ESS18_control %>%
+  rename(uemp3m_c.corN = x)%>%
+  select(subset = -c(term))
+
+ESS18_control <- ESS18_control %>%
+  mutate(uemp12m_num = scales::rescale(as.numeric(uemp12m), to = c(0,10)))
+ESS18_control <- ESS18_control %>%
+  mutate(uemp12m.corN <- correlate(Norris, uemp12m_num, method = "spearman"))
+ESS18_control <- ESS18_control %>%
+  rename(uemp12m.corN = x)%>%
+  select(subset = -c(term))
+ESS18_control <- ESS18_control %>%
+  group_by(cntry)%>%
+  mutate(uemp12m.corN <-correlate(Norris, uemp12m_num, method = "spearman"))%>%
+  ungroup
+ESS18_control <- ESS18_control %>%
+  rename(uemp12m_c.corN = x)%>%
+  select(subset = -c(term))
+```
+
+økonomiske usikkerhed
+```{r, include=FALSE, echo=FALSE, message=F}
+ESS18_control <- ESS18_control %>%
+  mutate(hincfel_10 = scales::rescale(as.numeric(hincfel), to = c(0,10)))
+ESS18_control <- ESS18_control %>%
+  mutate(hincfel.corN <- correlate(Norris, hincfel_10, method = "spearman"))
+ESS18_control <- ESS18_control %>%
+  rename(hincfel.corN = x)%>%
+  select(subset = -c(term))
+ESS18_control <- ESS18_control %>%
+  group_by(cntry)%>%
+  mutate(hincfel.corN <-correlate(Norris, hincfel_10, method = "spearman"))%>%
+  ungroup
+ESS18_control <- ESS18_control %>%
+  rename(hincfel_c.corN = x)%>%
+  select(subset = -c(term))
+```
+
+
+
+```{r, include=FALSE, echo=FALSE, message=F}
+#parti <- parti %>%
+ # mutate(parti_dik_national_10 = rescale(as.numeric(parti_dik_national), to = c(0,10)))
+parti <- parti %>%
+  mutate(parti_dik_national.corN <- correlate(Norris, parti_dik_national, method = "spearman"))
+parti <- parti %>%
+  rename(parti_dik_national.corN = x)%>%
+  select(subset = -c(term))
+parti <- parti %>%
+  group_by(cntry)%>%
+  mutate(parti_dik_national.corN <-correlate(Norris, parti_dik_national, method = "spearman"))%>%
+  ungroup
+parti <- parti %>%
+  rename(parti_dik_national_c.corN = x)%>%
+  select(subset = -c(term))
+```
+
+
+
+
+
+
+datasæt kun for kristen
+```{r, include=FALSE, echo=FALSE, message=F}
+ESS18_control_k <- ESS18_control_k %>%
+  group_by(cntry)%>%
+  mutate(udd.cor <-correlate(PVQ, eisced))%>%
+  ungroup
+ESS18_control_k <- ESS18_control_k %>%
+  rename(udd.cor = x)%>%
+  select(subset = -c(term))
+```
+
+
+```{r, include=FALSE, echo=FALSE, message=F}
+ESS18_control_k <- ESS18_control_k %>%
+  mutate(indvandre_num = scales::rescale(as.numeric(indvandre), to = c(0,10)))
+ESS18_control_k <- ESS18_control_k %>%
+  mutate(indvandre.cor <- correlate(PVQ, indvandre_num, method = "spearman"))
+ESS18_control_k <- ESS18_control_k %>%
+  rename(indvandre.cor = x)%>%
+  select(subset = -c(term))
+ESS18_control_k <- ESS18_control_k %>%
+  group_by(cntry)%>%
+  mutate(indvandre_c.cor <-correlate(PVQ, indvandre_num, method = "spearman"))%>%
+  ungroup
+ESS18_control_k <- ESS18_control_k %>%
+  rename(indvandre_c.cor = x)%>%
+  select(subset = -c(term))
+```
+
+
+```{r, include=FALSE, echo=FALSE, message=F}
+ESS18_control_k <- ESS18_control_k %>%
+  mutate(Ethnic_num = scales::rescale(as.numeric(Ethnic), to = c(0,10)))
+ESS18_control_k <- ESS18_control_k %>%
+  mutate(Ethnic_num.cor <- correlate(PVQ, Ethnic_num, method = "spearman"))
+ESS18_control_k <- ESS18_control_k %>%
+  rename(Ethnic_num.cor = x)%>%
+  select(subset = -c(term))
+ESS18_control_k <- ESS18_control_k %>%
+  group_by(cntry)%>%
+  mutate(Ethnic_num.cor <-correlate(PVQ, Ethnic_num, method = "spearman"))%>%
+  ungroup
+ESS18_control_k <- ESS18_control_k %>%
+  rename(Ethnic_num_c.cor = x)%>%
+  select(subset = -c(term))
+
+ESS18_control_k <- ESS18_control_k %>%
+  mutate(rel.cor <- correlate(PVQ, rlgdgr))
+ESS18_control_k <- ESS18_control_k %>%
+  rename(rel.cor = x)%>%
+  select(subset = -c(term))
+ESS18_control_k <- ESS18_control_k %>%
+  group_by(cntry)%>%
+  mutate(rel_c.cor <-correlate(PVQ, rlgdgr))%>%
+  ungroup
+ESS18_control_k <- ESS18_control_k %>%
+  rename(rel_c.cor = x)%>%
+  select(subset = -c(term))
+```
+
+
+```{r, include=FALSE, echo=FALSE, message=F}
+
+ESS18_control_k <- ESS18_control_k %>%
+  mutate(sex_num = scales::rescale(as.numeric(sex), to = c(0,10)))
+ESS18_control_k <- ESS18_control_k %>%
+  mutate(sex.cor <- correlate(PVQ, sex_num, method = "spearman"))
+ESS18_control_k <- ESS18_control_k %>%
+  rename(sex.cor = x)%>%
+  select(subset = -c(term))
+ESS18_control_k <- ESS18_control_k %>%
+  group_by(cntry)%>%
+  mutate(sex.cor <-correlate(PVQ, sex_num, method = "spearman"))%>%
+  ungroup
+ESS18_control_k <- ESS18_control_k %>%
+  rename(sex_c.cor = x)%>%
+  select(subset = -c(term))
+```
+
+
+
+indkomst niveau 
+```{r, include=FALSE, echo=FALSE, message=F}
+ESS18_control_k <- ESS18_control_k %>%
+  mutate(indkomst_niveau.cor <- correlate(PVQ, hinctnta))
+ESS18_control_k <- ESS18_control_k %>%
+  rename(indkomst_niveau.cor = x)%>%
+  select(subset = -c(term))
+ESS18_control_k <- ESS18_control_k %>%
+  group_by(cntry)%>%
+  mutate(indkomst_niveau_c.cor <-correlate(PVQ, hinctnta))%>%
+  ungroup
+ESS18_control_k <- ESS18_control_k %>%
+  rename(indkomst_niveau_c.cor = x)%>%
+  select(subset = -c(term))
+```
+
+arbejdsløshed sidste 3 og 12 måneder 
+```{r, include=FALSE, echo=FALSE, message=F}
+ESS18_control_k <- ESS18_control_k %>%
+  mutate(uemp3m_num = scales::rescale(as.numeric(uemp3m), to = c(0,10)))
+ESS18_control_k <- ESS18_control_k %>%
+  mutate(uemp3m.cor <- correlate(PVQ, uemp3m_num, method = "spearman"))
+ESS18_control_k <- ESS18_control_k %>%
+  rename(uemp3m.cor = x)%>%
+  select(subset = -c(term))
+ESS18_control_k <- ESS18_control_k %>%
+  group_by(cntry)%>%
+  mutate(uemp3m.cor <-correlate(PVQ, uemp3m_num, method = "spearman"))%>%
+  ungroup
+ESS18_control_k <- ESS18_control_k %>%
+  rename(uemp3m_c.cor = x)%>%
+  select(subset = -c(term))
+
+ESS18_control_k <- ESS18_control_k %>%
+  mutate(uemp12m_num = scales::rescale(as.numeric(uemp12m), to = c(0,10)))
+ESS18_control_k <- ESS18_control_k %>%
+  mutate(uemp12m.cor <- correlate(PVQ, uemp12m_num, method = "spearman"))
+ESS18_control_k <- ESS18_control_k %>%
+  rename(uemp12m.cor = x)%>%
+  select(subset = -c(term))
+ESS18_control_k <- ESS18_control_k %>%
+  group_by(cntry)%>%
+  mutate(uemp12m.cor <-correlate(PVQ, uemp12m_num, method = "spearman"))%>%
+  ungroup
+ESS18_control_k <- ESS18_control_k %>%
+  rename(uemp12m_c.cor = x)%>%
+  select(subset = -c(term))
+```
+
+økonomiske usikkerhed
+```{r, include=FALSE, echo=FALSE, message=F}
+ESS18_control_k <- ESS18_control_k %>%
+  mutate(hincfel_10 = scales::rescale(as.numeric(hincfel), to = c(0,10)))
+ESS18_control_k <- ESS18_control_k %>%
+  mutate(hincfel.cor <- correlate(PVQ, hincfel_10, method = "spearman"))
+ESS18_control_k <- ESS18_control_k %>%
+  rename(hincfel.cor = x)%>%
+  select(subset = -c(term))
+ESS18_control_k <- ESS18_control_k %>%
+  group_by(cntry)%>%
+  mutate(hincfel.cor <-correlate(PVQ, hincfel_10, method = "spearman"))%>%
+  ungroup
+ESS18_control_k <- ESS18_control_k %>%
+  rename(hincfel_c.cor = x)%>%
+  select(subset = -c(term))
+```
+
+
+
+```{r, include=FALSE, echo=FALSE, message=F}
+#parti <- parti %>%
+ # mutate(parti_dik_national_10 = rescale(as.numeric(parti_dik_national), to = c(0,10)))
+ESS18_control_k <- ESS18_control_k %>%
+  mutate(parti_dik_national.cor <- correlate(PVQ, parti_dik_national, method = "spearman"))
+ESS18_control_k <- ESS18_control_k %>%
+  rename(parti_dik_national.cor = x)%>%
+  select(subset = -c(term))
+ESS18_control_k <- ESS18_control_k %>%
+  group_by(cntry)%>%
+  mutate(parti_dik_national.cor <-correlate(PVQ, parti_dik_national, method = "spearman"))%>%
+  ungroup
+ESS18_control_k <- ESS18_control_k %>%
+  rename(parti_dik_national_c.cor = x)%>%
+  select(subset = -c(term))
+```
+
+
+
+```{r}
+edd <- ESS18_control %>%
+  select(eisced, PVQ)%>%
+  filter(eisced != "NA", PVQ != "NA")
+edd.rcorr = rcorr(as.matrix(edd))
+edd.rcorr
+edd.p = edd.rcorr$P
+```
+
+```{r}
+corstars <-function(x, method=c("pearson", "spearman"), removeTriangle=c("upper", "lower"),
+                     result=c("none", "html", "latex")){
+    #Compute correlation matrix
+    require(Hmisc)
+    x <- as.matrix(x)
+    correlation_matrix<-rcorr(x, type=method[1])
+    R <- correlation_matrix$r # Matrix of correlation coeficients
+    p <- correlation_matrix$P # Matrix of p-value 
+    
+    ## Define notions for significance levels; spacing is important.
+    mystars <- ifelse(p < .0001, "****", ifelse(p < .001, "*** ", ifelse(p < .01, "**  ", ifelse(p < .05, "*   ", "    "))))
+    
+    ## trunctuate the correlation matrix to two decimal
+    R <- format(round(cbind(rep(-1.11, ncol(x)), R), 2))[,-1]
+    
+    ## build a new matrix that includes the correlations with their apropriate stars
+    Rnew <- matrix(paste(R, mystars, sep=""), ncol=ncol(x))
+    diag(Rnew) <- paste(diag(R), " ", sep="")
+    rownames(Rnew) <- colnames(x)
+    colnames(Rnew) <- paste(colnames(x), "", sep="")
+    
+    ## remove upper triangle of correlation matrix
+    if(removeTriangle[1]=="upper"){
+      Rnew <- as.matrix(Rnew)
+      Rnew[upper.tri(Rnew, diag = TRUE)] <- ""
+      Rnew <- as.data.frame(Rnew)
+    }
+    
+    ## remove lower triangle of correlation matrix
+    else if(removeTriangle[1]=="lower"){
+      Rnew <- as.matrix(Rnew)
+      Rnew[lower.tri(Rnew, diag = TRUE)] <- ""
+      Rnew <- as.data.frame(Rnew)
+    }
+    
+    ## remove last column and return the correlation matrix
+    Rnew <- cbind(Rnew[1:length(Rnew)-1])
+    if (result[1]=="none") return(Rnew)
+    else{
+      if(result[1]=="html") print(xtable(Rnew), type="html")
+      else print(xtable(Rnew), type="latex") 
+    }
+} 
+
+```
+
+```{r}
+ESS_control_cor_pearson <- ESS18_control %>%
+  select(PVQ, eisced, Hincsrca, hincfel, hinctnta, domicil, agea, rlgdgr)
+
+ESS_control_cor_spearman <- ESS18_control %>%
+  select(PVQ, uemp3m, uemp12m, sex, indvandre, Ethnic)%>%
+  mutate(uemp3m <- as.numeric(uemp3m), uemp12m <- as.numeric(uemp12m), sex <- as.numeric(sex), indvandre <- as.numeric(indvandre))%>%
+  filter(!is.na(PVQ))
+```
+
+
+```{r}
+corstars(ESS_control_cor_pearson, method="pearson", result="latex")
+```
+```{r}
+corstars(ESS_control_cor_spearman, result="latex")
+```
+
+```{r}
+edd <- lm(PVQ ~ eisced, ESS_control_cor_pearson)
+summary(edd)
+```
+```{r}
+weighted_corr <- cov.wt(ESS18_control$PVQ, ESS18_control$eisced, method = "pearson", wt = anweight)
+```
+
+```{r}
+ESS_control_cor_pearson <- na.omit(ESS_control_cor_pearson)
+
+ESS_control_cor_pearson <- data.frame(lapply(ESS_control_cor_pearson, function(x) as.numeric(as.character(x))))
+
+anweight <- as.vector(ESS_control_cor_pearson$anweight)
+
+```
+
+
+```{r}
+weighted_corr <- cov.wt(ESS_control_cor_pearson, wt = anweight, cor = TRUE)
+
+corr_matrix <- weighted_corr$cor
+
+```
+
+```{r}
+ESS_edu <- ESS18_control%>%
+  select(PVQ, anweight, eisced)
+ESS_edu <- na.omit(ESS_edu)
+anweight <- as.vector(ESS_edu$anweight)
+
+weighted_corr <- cov.wt(ESS_edu, wt = anweight, cor = TRUE)
+
+corr_matrix <- weighted_corr$cor
+
+```
+
+```{r}
+library(jtools)
+```
+
+```{r}
+pairs(ESS_control_cor_pearson, pch = 19, lower.panel = NULL)
+```
+```{r}
+library(psych)
+pairs.panels(ESS_control_cor_pearson, 
+             method = "pearson", # correlation method
+             hist.col = "#00AFBB",
+             density = F,  # show density plots
+             ellipses = F, # show correlation ellipses
+             stars = TRUE)
+
+
+```
+
+```{r}
+pairs.panels(ESS_control_cor_pearson, 
+             method = "spearman", # correlation method
+             hist.col = "#00AFBB",
+             density = F,  # show density plots
+             ellipses = F, # show correlation ellipses
+             stars=TRUE)
+```
+
+```{r}
+ESS_control_cor_peason <- ESS18_control %>%
+  select(PVQ, eisced, hincfel, hinctnta, domicil, agea, rlgdgr, anweight, cntry)
+ESS_control_cor_peason$cntry <- as.numeric( ESS_control_cor_peason$cntry)
+```
+
+
+```{r}
+sb <- statsBy(ESS_control_cor_peason, cntry, cors = TRUE, cor="cor", method="pearson", use="pairwise", poly=FALSE, na.rm=TRUE,alpha=.05,minlength=5,weights=anweight)
+```
+```{r}
+
+```
+

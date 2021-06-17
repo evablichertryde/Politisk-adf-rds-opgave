@@ -1,0 +1,151 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+ess_election_dates_9  <- ess_election_dates%>%
+  filter(essround == 9)
+```
+
+```{r}
+ESS18<- read.csv("../original data/ESS18.csv")
+
+```
+
+
+
+```{r}
+ess_election_dates_9$field_start[ess_election_dates_9$cntry == "BG"] <- as.Date("2018-11-01")
+ess_election_dates_9$field_end[ess_election_dates_9$cntry == "BG"] <- as.Date("2018-12-01")
+ess_election_dates_9$recent_election[ess_election_dates_9$cntry == "BG"] <- as.Date("2017-03-26")
+
+```
+
+```{r}
+ess_election_dates_9$recent_election[ess_election_dates_9$cntry == "RS"] <- as.Date("2016-04-24")
+```
+
+mangler medtage
+ES, HR, LT, LV, ME, PT, SE, SK
+
+
+```{r}
+ES_field <- ESS18 %>%
+  filter(cntry == "ES")%>%
+  select(proddate, inwdds, inwmms, inwyys, inwdde, inwmme, inwyye, X)
+ES_end <- ES_field%>%
+  filter(inwyys == 2020)
+```
+
+```{r}
+HR_field <- ESS18 %>%
+  filter(cntry == "HR")%>%
+  select(proddate, inwdds, inwmms, inwyys, inwdde, inwmme, inwyye, X)
+HR_start <- HR_field%>%
+  filter(inwyys == 2019, inwmms == 9)
+#2019-09-20, 2020-21-01
+rm(HR_end, HR_field, HR_start)
+```
+
+```{r}
+LT_field <- ESS18 %>%
+  filter(cntry == "LT")%>%
+  select(proddate, inwdds, inwmms, inwyys, inwdde, inwmme, inwyye, X)
+LT_end <- LT_field%>%
+  filter(inwyys == 2019, inwmms == 12)
+rm(LT_end, LT_field, LT_start)
+```
+data indsamlet, 2019-09-21, 2019-12-15
+
+```{r}
+LV_field <- ESS18 %>%
+  filter(cntry == "LV")%>%
+  select(proddate, inwdds, inwmms, inwyys, inwdde, inwmme, inwyye, X)
+LV_start <- LV_field%>%
+  filter(inwyys == 2019, inwmms == 10)
+LV_end <- LV_field%>%
+  filter(inwyys == 2020)
+rm(LV_end, LV_field, LV_start)
+```
+2020-01-20
+2019-10-10
+
+```{r}
+ME_field <- ESS18 %>%
+  filter(cntry == "ME")%>%
+  select(proddate, inwdds, inwmms, inwyys, inwdde, inwmme, inwyye, X)
+ME_start <- ME_field%>%
+  filter(inwyys == 2019, inwmms == 5)
+ME_end <- ME_field%>%
+  filter(inwyys == 2019, inwmms == 10)
+rm(ME_end, ME_field, ME_start)
+```
+2019-05-22, 2019-10-28 - "2016-10-16"
+
+```{r}
+PT_field <- ESS18 %>%
+  filter(cntry == "PT")%>%
+  select(proddate, inwdds, inwmms, inwyys, inwdde, inwmme, inwyye, X)
+PT_start <- PT_field%>%
+  filter(inwyys == 2018, inwmms == 11)
+PT_end <- PT_field%>%
+  filter(inwyys == 2019, inwmms == 12)
+rm(PT_end, PT_field, PT_start)
+```
+2018-11-26, 2019-12-23
+
+```{r}
+SE_field <- ESS18 %>%
+  filter(cntry == "SE")%>%
+  select(proddate, inwdds, inwmms, inwyys, inwdde, inwmme, inwyye, X)
+SE_start <- SE_field%>%
+  filter(inwyys == 2018, inwmms == 9)
+SE_end <- SE_field%>%
+  filter(inwyys == 2019, inwmms == 5)
+rm(SE_end, SE_field, SE_start)
+```
+2018-09-03, 2019-05-12
+
+```{r}
+SK_field <- ESS18 %>%
+  filter(cntry == "SK")%>%
+  select(proddate, inwdds, inwmms, inwyys, inwdde, inwmme, inwyye, X)
+SK_start <- SK_field%>%
+ filter(inwyys == 2019, inwmms == 6)
+SK_end <- SK_field%>%
+  filter(inwyys == 2019, inwmms == 12)
+rm(SK_end, SK_field, SK_start)
+```
+2019-12-07, 2019-05-30 
+```{r}
+cntry <- c("ES", "HR", "LT", "LV", "ME", "PT", "SE", "SK")
+essround <- c(9, 9, 9, 9, 9, 9, 9, 9)
+field_start <- c("2019-11-11", "2019-09-20", "2019-09-21","2019-10-10", "2019-05-22", "2018-11-26", "2018-09-03", "2019-05-30")
+field_end <- c("2020-01-27", "2020-01-21", "2019-12-15", "2020-01-20", "2019-10-28", "2019-12-23", "2019-05-12", "2019-12-07")
+recent_election <- c("2016-06-26", "2016-09-11", "2016-10-09", "2014-10-04", "2016-10-16", "2015-10-04", "2014-09-04", "2016-03-05")
+
+tilføjet_data <- data.frame(cntry, essround, field_start, field_end, recent_election)
+```
+
+```{r}
+tilføjet_data <- tilføjet_data %>%
+  mutate(field_start = as.Date(field_start), field_end = as.Date(field_end), recent_election = as.Date(recent_election))
+```
+
+
+```{r}
+ess_election_dates_9 <- rbind(ess_election_dates_9, tilføjet_data)
+```
+
+```{r}
+write.csv(ess_election_dates_9, file = "../tema datasæt/ess_election_dates_9.csv")
+```
+
+
+
+
+```{r}
+table(ESS18$cntry)
+```
+

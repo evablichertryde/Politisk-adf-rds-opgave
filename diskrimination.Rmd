@@ -1,0 +1,68 @@
+---
+title: "diskrimiation"
+output: htlm_notebook
+editor_options: 
+  chunk_output_type: inline
+header-includes:
+    - \usepackage{setspace}\doublespacing
+    - \usepackage{booktabs} 
+    - \usepackage{tabularx}
+    - \usepackage{tidy}
+output:   
+  bookdown::pdf_document2:
+  fig_caption: true
+  fontsize: 10.5pt
+---
+
+```{r hente-pakker, message=FALSE, include=FALSE, echo=FALSE}
+library(dplyr) # Kan rense det nye data
+library(tidyr)
+library(stringr) # Til arbejde med string-data
+library(ggplot2) # Til visualisering af resultater
+library(tidyverse) #datoer
+library(haven) # til at åbne datasæt 
+library(Hmisc)
+library(corrr)
+library(xtable)
+library(jtools)
+library(weights)
+library(broom)
+library(purrr)
+```
+
+```{r åbne data, message=FALSE, include=FALSE, echo=FALSE}
+PVQ<- read.csv("../tema datasæt/PVQ_r.csv")
+weights<- read.csv("../tema datasæt/weights.csv")
+wellbeing<- read.csv("../tema datasæt/ESS18_wellbeing.csv")
+```
+
+```{r, include=FALSE, echo=FALSE}
+wellbeing <- left_join(wellbeing, PVQ, by = "id")
+wellbeing <- left_join(wellbeing, weights, by = "id")
+rm(PVQ, weights)
+```
+
+```{r}
+diskrimination <- wellbeing%>%
+  select(c(id, cntry, anweight, PVQ, dscrgrp:dscrnap))
+```
+
+```{r}
+table(diskrimination$dscroth)
+```
+
+| Variable | Beskrivelse                                             | Ja kode | Antal |
+|----------|---------------------------------------------------------|---------|-------|
+| dscrgrp  | Member of a group discriminated against in this country | 1       | 3477  |
+| dscrrce  | Discrimination of respondent's group: colour or race    | 1       | 450   |
+| dscrntn  | Discrimination of respondent's group: nationality       | 1       | 712   |
+| dscrrlg  | Discrimination of respondent's group: religion          | 1       | 610   |
+| dscrlng  | Discrimination of respondent's group: language          | 1       | 323   |
+| dscretn  | Discrimination of respondent's group: ethnic group      | 1       | 437   |
+| dscrage  | Discrimination of respondent's group: age               | 1       | 433   |
+| dscrgnd  | Discrimination of respondent's group: gender            | 1       | 476   |
+| dscrsex  | Discrimination of respondent's group: sexuality         | 1       | 251   |
+| dscrdsb  | Discrimination of respondent's group: disability        | 1       | 291   |
+| dscroth  | Discrimination of respondent's group: other grounds     | 1       | 850   |
+
+: diskrimination

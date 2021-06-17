@@ -1,0 +1,145 @@
+---
+title: "politics clean"
+output: htlm_notebook
+editor_options: 
+  chunk_output_type: inline
+header-includes:
+    - \usepackage{setspace}\doublespacing
+    - \usepackage{booktabs} 
+    - \usepackage{tabularx}
+    - \usepackage{tidy}
+output:   
+  bookdown::pdf_document2:
+  fig_caption: true
+  fontsize: 10.5pt
+---
+```{r hente-pakker, message=FALSE, include=FALSE, echo=FALSE}
+library(dplyr) # Kan rense det nye data
+library(tidyr)
+library(stringr) # Til arbejde med string-data
+library(ggplot2) # Til visualisering af resultater
+library(viridis)
+library(lubridate)
+library(ggpubr) # Flere plots sammen
+library(openxlsx) # Kan loade og gemme excel
+library(ggpubr)
+library(tidyverse)
+library(haven) # til at åbne datasæt 
+```
+
+
+##åbne data 
+data fra 2018
+```{r åben data, include=FALSE, echo=FALSE}
+ESS18_politics<- read.csv("../tema datasæt/ESS18_politics.csv")
+ESS18_politics <- subset(ESS18_politics, select = -c(X, prtvblt2, prtvblt3, prtvede2))
+```
+
+
+
+```{r}
+party <- subset(ESS18_politics, select = c(prtvtcat:prtvtfsi))
+party <- rowSums(party, na.rm = TRUE)
+ESS18_politics$voteparty <- party
+ESS18_politics <- subset(ESS18_politics, select = -c(prtvtcat:prtvtfsi))
+```
+
+```{r}
+party <- subset(ESS18_politics, select = c(prtcldat:prtcldsk))
+party <- rowSums(party, na.rm = TRUE)
+ESS18_politics$closeparty <- party
+ESS18_politics <- subset(ESS18_politics, select = -c(prtcldat:prtcldsk))
+```
+
+
+trust index 
+bruger variablerne, trstplt, trstprt, trstprl, trstplc, trstlgl
+```{r}
+trust <- subset(ESS18_politics, select = c(idno, trstplt, trstprt, trstprl, trstplc, trstlgl))
+
+
+sum(is.na(trust))
+sum(is.na(trust$trstplt))
+sum(is.na(trust$trstprt))
+sum(is.na(trust$trstprl))
+sum(is.na(trust$trstplc))
+sum(is.na(trust$trstlgl))
+
+unique(trust)
+
+```
+
+
+```{r}
+trust <- trust %>%
+  rowwise()%>%
+  mutate(trust_norris = mean(c(trstplt, trstprt, trstprl, trstplc, trstlgl)), trust_norris_na = sum(is.na(c(trstplt, trstprt, trstprl, trstplc, trstlgl))))
+```
+
+```{r}
+#lave denisity plot over fordeling på trust index
+library(ggplot2)
+summary(trust$trust_norris)
+quantile(trust$trust_norris, c(.025, 0.975), na.rm=TRUE) 
+
+
+ggplot(trust, aes(trust_norris))+
+  geom_density()+
+  geom_vline(xintercept = 4.631, linetype = "dashed")+ #gennemsnit
+  geom_vline(xintercept = 3, linetype = "dashed")+ #25 %
+  geom_vline(xintercept = 6.2, linetype = "dashed")+ #75 %
+  geom_vline(xintercept = 0.2, linetype = "dashed")+ #2.5%
+  geom_vline(xintercept = 8.4, linetype = "dashed")#97,5%
+```
+
+
+```{r, message=FALSE, include=FALSE, echo=FALSE}
+library(psych)
+```
+
+O
+```{r}
+trust_ma <- data.matrix(subset(trust, select = c(trstplt, trstprt, trstprl, trstplc, trstlgl)))
+
+```
+
+```{r}
+trust_alpha <- alpha(x = trust_ma)
+trust_alpha
+```
+```{r}
+library(corrr)
+corre <- correlate(trust_ma)
+as_matrix(corre)
+
+
+
+
+item_intercor(trust_ma, method = c("pearson"))
+```
+```{r bivariat korrelation test}
+cor.test(trust$trstplt, trust$trstprt)
+#korrelere i højgrad, men er ikke over 0,9, så tyder ikke på multicolaritet. 
+#positiv korrelation mellem de to, meget signifikant positiv korrelation mellem de to variabler. se video https://www.youtube.com/watch?v=2J_ZlxLeuQU.
+```
+```{r multivariate }
+
+rcorr(trust_ma, type = c("pearson"))
+
+```
+
+
+```{r}
+trust_df <- subset(trust, select = c(trstplt, trstprt, trstprl, trstplc, trstlgl))
+alpha(trust_df)
+```
+
+```{r}
+dput(head(trust_ma))
+```
+
+
+```{r}
+rm(list = ls())
+```
+

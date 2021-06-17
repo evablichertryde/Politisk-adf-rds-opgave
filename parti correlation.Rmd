@@ -1,0 +1,356 @@
+---
+title: "parti correlation"
+output: htlm_notebook
+editor_options: 
+  chunk_output_type: inline
+header-includes:
+    - \usepackage{setspace}\doublespacing
+    - \usepackage{booktabs} 
+    - \usepackage{tabularx}
+    - \usepackage{tidy}
+output:   
+  bookdown::pdf_document2:
+  fig_caption: true
+  fontsize: 10.5pt
+---
+```{r hente-pakker, message=FALSE, include=FALSE, echo=FALSE}
+library(dplyr) # Kan rense det nye data
+library(tidyr)
+library(stringr) # Til arbejde med string-data
+library(ggplot2) # Til visualisering af resultater
+library(viridis)
+library(lubridate)
+library(ggpubr) # Flere plots sammen
+library(openxlsx) # Kan loade og gemme excel
+library(ggpubr)
+library(tidyverse)
+library(haven) # til at åbne datasæt 
+library(Hmisc)
+library(scales)
+library(corrr)
+library(xtable)
+library(jtools)
+library(weights)
+```
+
+```{r}
+parti <- read.csv("../tema datasæt/parti.csv")
+PVQ<- read.csv("../tema datasæt/PVQ.csv")
+weights<- read.csv("../tema datasæt/weights.csv")
+```
+
+```{r}
+parti <- left_join(parti, PVQ, by = "id")
+parti <- left_join(parti, weights, by = "id")
+rm(PVQ, weights)
+```
+
+
+```{r}
+parti$national[parti$cmp_parfam.x %in% c(70)] <- 1
+parti$national[parti$cmp_parfam.x %in% c(10, 20, 30, 40, 50, 60, 80)] <- 0
+parti$national[parti$cmp_parfam.x %in% c(90, 95, 98, 999)] <- NA
+
+parti$konservativ[parti$cmp_parfam.x %in% c(60)] <- 1
+parti$konservativ[parti$cmp_parfam.x %in% c(10, 20, 30, 40, 50, 70, 80)] <- 0
+parti$konservativ[parti$cmp_parfam.x %in% c(90, 95, 98, 999)] <- NA
+
+parti$natkon[parti$cmp_parfam.x %in% c(60, 70)] <- 1
+parti$natkon[parti$cmp_parfam.x %in% c(10, 20, 30, 40, 50, 80)] <- 0
+parti$natkon[parti$cmp_parfam.x %in% c(90, 95, 98, 999)] <- NA
+```
+
+parti <- parti%>%
+  select(national, konservativ, natkon, cntry, PVQ.y, Norris, Feldman, anweight)
+
+
+parti$national <- scales::rescale(as.numeric(parti$national), to = c(0,10))
+parti$konservativ <- scales::rescale(as.numeric(parti$konservativ), to = c(0,10))
+parti$natkon <- scales::rescale(as.numeric(parti$natkon), to = c(0,10))
+
+
+
+
+
+#str(parti)
+
+
+
+```{r}
+country_df <- function(df, col_name, value){
+  df <- df%>%
+    filter({{col_name}} == {{value}})
+  return(df)}
+
+country_correlation <- function(df, x){
+  
+  correlation_national_p <- as.data.frame(correlate(df$PVQ.y, as.numeric(df$national)))
+  correlation_national_p$variable <- "national"
+  correlation_national_p$aut <- "PVQ"
+  
+  correlation_konservativ_p <- as.data.frame(correlate(df$PVQ.y, as.numeric(df$konservativ)))
+correlation_konservativ_p$variable <- "konservativ"
+  correlation_konservativ_p$aut <- "PVQ"
+
+
+correlation_natkon_p <- as.data.frame(correlate(df$PVQ.y, as.numeric(df$natkon)))
+correlation_natkon_p$variable <- "natkon"
+  correlation_natkon_p$aut <- "PVQ"
+  
+
+  correlation_national_n <- as.data.frame(correlate(df$Norris, as.numeric(df$national)))
+  correlation_national_n$variable <- "national"
+  correlation_national_n$aut <- "Norris"
+  
+  correlation_konservativ_n <- as.data.frame(correlate(df$Norris, as.numeric(df$konservativ)))
+correlation_konservativ_n$variable <- "konservativ"
+  correlation_konservativ_n$aut <- "Norris"
+
+
+  
+correlation_natkon_n <- as.data.frame(correlate(df$Norris, as.numeric(df$natkon)))
+correlation_natkon_n$variable <- "natkon"
+  correlation_natkon_n$aut <- "Norris"
+  
+correlation_national_f <- as.data.frame(correlate(df$Feldman, as.numeric(df$national)))
+  correlation_national_f$variable <- "national"
+  correlation_national_f$aut <- "Feldman"
+  
+  correlation_konservativ_f <- as.data.frame(correlate(df$Feldman, as.numeric(df$konservativ)))
+correlation_konservativ_f$variable <- "konservativ"
+  correlation_konservativ_f$aut <- "Feldman"
+
+
+correlation_natkon_f <- as.data.frame(correlate(df$Feldman, as.numeric(df$natkon)))
+correlation_natkon_f$variable <- "natkon"
+  correlation_natkon_f$aut <- "Feldman"
+  
+  
+  
+  name <- bind_rows(correlation_national_p, correlation_konservativ_p, correlation_natkon_p, 
+                    correlation_national_n, correlation_konservativ_n, correlation_natkon_n, 
+                    correlation_national_f, correlation_konservativ_f, correlation_natkon_f)
+  name$country <- {{x}}
+  #name$p.value <- round(name$p.value, digits = 3)
+  return(name)
+}
+```
+
+
+```{r hente-pakker, message=FALSE, include=FALSE, echo=FALSE}
+correlation <- country_correlation(parti, x = "all")
+
+df_at <- country_df(parti, cntry, "AT")
+at_correlation <- country_correlation(df_at, x = "AT")
+```
+
+
+```{r hente-pakker, message=FALSE, include=FALSE, echo=FALSE}
+df_be <- country_df(parti, cntry, "BE")
+be_correlation <- country_correlation(df_be, x = "BE")
+
+#df_bg <- country_df(parti, cntry, "BG")
+#bg_correlation <- country_correlation(df_bg, x = "BG")
+
+df_ch <- country_df(parti, cntry, "CH")
+ch_correlation <- country_correlation(df_ch, x = "CH")
+
+df_cy <- country_df(parti, cntry, "CY")
+cy_correlation <- country_correlation(df_cy, x = "CY")
+
+df_cz <- country_df(parti, cntry, "CZ")
+cz_correlation <- country_correlation(df_cz, x = "CZ")
+
+df_de <- country_df(parti, cntry, "DE")
+de_correlation <- country_correlation(df_de, x = "DE")
+
+df_ee <- country_df(parti, cntry, "EE")
+ee_correlation <- country_correlation(df_ee, x = "EE")
+
+df_es <- country_df(parti, cntry, "ES")
+es_correlation <- country_correlation(df_es, x = "ES")
+
+df_fi <- country_df(parti, cntry, "FI")
+fi_correlation <- country_correlation(df_fi, x = "FI")
+
+df_fr <- country_df(parti, cntry, "FR")
+fr_correlation <- country_correlation(df_fr, x = "FR")
+
+df_gb <- country_df(parti, cntry, "GB")
+gb_correlation <- country_correlation(df_gb, x = "GB")
+
+df_hr <- country_df(parti, cntry, "HR")
+hr_correlation <- country_correlation(df_hr, x = "HR")
+
+df_hu <- country_df(parti, cntry, "HU")
+hu_correlation <- country_correlation(df_hu, x = "HU")
+
+df_ie <- country_df(parti, cntry, "IE")
+ie_correlation <- country_correlation(df_ie, x = "IE")
+
+df_it <- country_df(parti, cntry, "IT")
+it_correlation <- country_correlation(df_it, x = "IT")
+
+df_lt <- country_df(parti, cntry, "LT")
+lt_correlation <- country_correlation(df_lt, x = "LT")
+
+df_lv <- country_df(parti, cntry, "LV")
+lv_correlation <- country_correlation(df_lv, x = "LV")
+
+df_me <- country_df(parti, cntry, "ME")
+me_correlation <- country_correlation(df_me, x = "ME")
+
+df_nl <- country_df(parti, cntry, "NL")
+nl_correlation <- country_correlation(df_nl, x = "NL")
+
+df_no <- country_df(parti, cntry, "NO")
+no_correlation <- country_correlation(df_no, x = "NO")
+
+df_pl <- country_df(parti, cntry, "PL")
+pl_correlation <- country_correlation(df_pl, x = "PL")
+
+df_pt <- country_df(parti, cntry, "PT")
+pt_correlation <- country_correlation(df_pt, x = "PT")
+
+df_rs <- country_df(parti, cntry, "RS")
+rs_correlation <- country_correlation(df_rs, x = "RS")
+
+df_se <- country_df(parti, cntry, "SE")
+se_correlation <- country_correlation(df_se, x = "SE")
+
+df_si <- country_df(parti, cntry, "SI")
+si_correlation <- country_correlation(df_si, x = "SI")
+
+#df_sk <- country_df(parti, cntry, "SK")
+#sk_correlation <- country_correlation(df_sk, x = "SK")
+```
+
+```{r}
+correlation <- bind_rows(correlation, at_correlation, be_correlation, ch_correlation, cy_correlation, cz_correlation, de_correlation, ee_correlation, es_correlation, fi_correlation, fr_correlation, gb_correlation, hr_correlation, hu_correlation, ie_correlation, it_correlation, lt_correlation, lv_correlation, me_correlation, nl_correlation, no_correlation, pl_correlation, pt_correlation, rs_correlation, se_correlation, si_correlation)
+
+```
+
+```{r}
+rm(at_correlation, be_correlation, bg_correlation, ch_correlation, cy_correlation, cz_correlation, de_correlation, ee_correlation, es_correlation, fi_correlation, fr_correlation, gb_correlation, hr_correlation, hu_correlation, ie_correlation, it_correlation, lt_correlation, lv_correlation, me_correlation, nl_correlation, no_correlation, pl_correlation, pt_correlation, rs_correlation, se_correlation, si_correlation, sk_correlation, df_at, df_be, df_bg, df_ch, df_cy, df_cz, df_de, df_ee, df_es, df_fi, df_fr, df_gb, df_hr, df_hu, df_ie, df_it, df_lt, df_lv, df_me, df_nl, df_no, df_pl, df_pt, df_rs, df_se, df_si, df_sk)
+```
+
+Der er flere lande hvor det ikke er muligt at undersøge dette for, da ESS interview periode har i det enkelt land både før og efter et parlaments valg. 
+
+```{r}
+na_c <- correlation %>%
+  filter(is.na(x))
+
+table(na_c$country)
+# 11 lande
+```
+```{r}
+correlation_all <- corstars(subset(parti, select = c(national, PVQ.y, Feldman, Norris)), result = "latex")
+
+```
+```{r}
+correlation_all <- corstars(subset(parti, select = c(konservativ, PVQ.y, Feldman, Norris)), result = "latex")
+
+```
+
+
+```{r}
+correlation_all <- corstars(subset(parti, select = c(natkon, PVQ.y, Norris, Feldman)), result = "latex")
+```
+```{r}
+parti_na <- correlation %>%
+  filter(x != "NA")
+```
+
+```{r}
+parti_AT <- parti %>%
+  filter(cntry == "AT")
+correlation_all <- corstars(subset(parti_AT, select = c(national, konservativ, natkon, PVQ.y, Norris, Feldman)), result = "latex")
+```
+```{r}
+parti_BE <- parti %>%
+  filter(cntry == "BE")
+correlation_all <- corstars(subset(parti_BE, select = c(national, konservativ, natkon, PVQ.y, Norris, Feldman)), result = "latex")
+```
+```{r} #NO RESULTS
+parti_BG <- parti %>%
+  filter(cntry == "BG")
+correlation_all <- corstars(subset(parti_BG, select = c(national, konservativ, natkon, PVQ.y, Norris, Feldman)), result = "latex")
+#```
+```{r}
+parti_CH <- parti %>%
+  filter(cntry == "CH")
+correlation_all <- corstars(subset(parti_CH, select = c(national, konservativ, natkon, PVQ.y, Norris, Feldman)), result = "latex")
+```
+```{r}
+parti_CY <- parti %>%
+  filter(cntry == "CY")
+correlation_all <- corstars(subset(parti_CY, select = c(national, konservativ, natkon, PVQ.y, Norris, Feldman)), result = "latex")
+```
+```{r}
+parti_CZ <- parti %>%
+  filter(cntry == "CZ")
+correlation_all <- corstars(subset(parti_CZ, select = c(national, konservativ, natkon, PVQ.y, Norris, Feldman)), result = "latex")
+```
+```{r}
+parti_EE <- parti %>%
+  filter(cntry == "EE")
+correlation_all <- corstars(subset(parti_EE, select = c(national, konservativ, natkon, PVQ.y, Norris, Feldman)), result = "latex")
+```
+
+```{r}
+parti_FI <- parti %>%
+  filter(cntry == "FI")
+correlation_all <- corstars(subset(parti_FI, select = c(national, konservativ, natkon, PVQ.y, Norris, Feldman)), result = "latex")
+```
+
+
+```{r}
+parti_FR <- parti %>%
+  filter(cntry == "FR")
+correlation_all <- corstars(subset(parti_FR, select = c(national, konservativ, natkon, PVQ.y, Norris, Feldman)), result = "latex")
+```
+```{r}
+parti_GB <- parti %>%
+  filter(cntry == "GB")
+correlation_all <- corstars(subset(parti_GB, select = c(national, konservativ, natkon, PVQ.y, Norris, Feldman)), result = "latex")
+```
+```{r}
+parti_IE <- parti %>%
+  filter(cntry == "IE")
+correlation_all <- corstars(subset(parti_IE, select = c(national, konservativ, natkon, PVQ.y, Norris, Feldman)), result = "latex")
+```
+
+```{r}
+IT <- parti %>%
+  filter(cntry == "IT")
+correlation_all <- corstars(subset(IT, select = c(national, konservativ, natkon, PVQ.y, Norris, Feldman)), result = "latex")
+```
+
+```{r}
+NL <- parti %>%
+  filter(cntry == "NL")
+correlation_all <- corstars(subset(NL, select = c(national, konservativ, natkon, PVQ.y, Norris, Feldman)), result = "latex")
+```
+
+```{r}
+NO <- parti %>%
+  filter(cntry == "NO")
+correlation_all <- corstars(subset(NO, select = c(national, konservativ, natkon, PVQ.y, Norris, Feldman)), result = "latex")
+```
+
+
+```{r}
+PL <- parti %>%
+  filter(cntry == "PL")
+correlation_all <- corstars(subset(PL, select = c(national, konservativ, natkon, PVQ.y, Norris, Feldman)), result = "latex")
+```
+
+
+```{r}
+PL <- parti %>%
+  filter(cntry == "PL")
+correlation_all <- corstars(subset(PL, select = c(national, konservativ, natkon, PVQ.y, Norris, Feldman)), result = "latex")
+```
+
+
+```{r}

@@ -1,0 +1,315 @@
+---
+title: "timing 05.12"
+output: htlm_notebook
+editor_options: 
+  chunk_output_type: inline
+header-includes:
+    - \usepackage{setspace}\doublespacing
+    - \usepackage{booktabs} 
+    - \usepackage{tabularx}
+    - \usepackage{tidy}
+output:   
+  bookdown::pdf_document2:
+  fig_caption: true
+  fontsize: 10.5pt
+---
+
+skal bruges til authoritær index. 
+```{r hente-pakker, message=FALSE, include=FALSE, echo=FALSE}
+library(dplyr) # Kan rense det nye data
+library(tidyr)
+library(stringr) # Til arbejde med string-data
+library(ggplot2) # Til visualisering af resultater
+library(viridis)
+library(lubridate)
+library(ggpubr) # Flere plots sammen
+library(openxlsx) # Kan loade og gemme excel
+library(ggpubr)
+library(tidyverse)
+library(haven) # til at åbne datasæt 
+library(Hmisc)
+library(corrr)
+library(psych)
+```
+
+
+##åbne data 
+data fra 2018
+```{r åben data, message=FALSE, include=F, echo=FALSE}
+ESS18_timing<- read.csv("../tema datasæt/ESS18_timing.csv")
+tradtionel_livs_timing <- ESS18_timing%>%
+  select(id)
+write.csv(tradtionel_livs_timing, file = ("../tema datasæt/tradtionel_livs_timing.csv"), row.names = FALSE)
+
+tradtionel_livs_timing <- read.csv("../tema datasæt/tradtionel_livs_timing.csv")
+```
+
+
+
+#alder man bliver voksen, middel aldre og gammel
+```{r ageadlt - Age become adults. SPLIT BALLOT, message=T, include=F, echo=FALSE}
+summary(ESS18_timing$ageadlt)
+# nul skal kodes til na, og person på 118, da folk ikke bliver så¨gamle - der er del outlier
+ESS18_timing$ageadlt[ESS18_timing$ageadlt == 0 | ESS18_timing$ageadlt == 118] <- NA
+class(ESS18_timing$ageadlt)
+ggplot(ESS18_timing, aes(ageadlt))+
+  geom_density()
+tradtionel_livs_timing$ageadlt <- ESS18_timing$ageadlt
+label(tradtionel_livs_timing$ageadlt) <- "Age become adults"
+```
+
+
+```{r agemage - Age reach middle age. SPLIT BALLOT, message=F, include=F, echo=FALSE}
+summary(ESS18_timing$agemage)
+ggplot(ESS18_timing, aes(agemage))+
+  geom_density()
+
+#0 kodes til NA. 0 dækker over "its depends"
+ESS18_timing$agemage[ESS18_timing$agemage == 0] <- NA
+ggplot(ESS18_timing, aes(agemage))+
+  geom_density()
+
+tradtionel_livs_timing$agemage <- ESS18_timing$agemage
+label(tradtionel_livs_timing$agemage) <- "Age reach middle age"
+summary(tradtionel_livs_timing$agemage)
+
+```
+
+
+
+```{r ageoage - Age reach old age. SPLIT BALLOT, message=F, include=F, echo=FALSE}
+summary(ESS18_timing$ageoage)
+ggplot(ESS18_timing, aes(ageoage))+
+  geom_density()
+#0 kodes til NA. 0 dækker over "its depends"
+ESS18_timing$ageoage[ESS18_timing$ageoage == 0 | ESS18_timing$ageoage > 100] <- NA
+summary(ESS18_timing$ageoage)
+ggplot(ESS18_timing, aes(ageoage))+
+  geom_density()
+
+tradtionel_livs_timing$ageoage <- ESS18_timing$ageoage
+label(tradtionel_livs_timing$ageoage) <- "Age reach old age"
+```
+
+
+
+#ideal alder til livsbegivenheder. 
+```{r iaglptn - Start living with partner not married to, ideal age. SPLIT BALLOT, message=FALSE, include=F, echo=FALSE}
+summary(ESS18_timing$iaglptn)
+ggplot(ESS18_timing, aes(iaglptn))+
+  geom_density()
+
+#111 er en stor outlier, som de fjerne jeg, da den ikke giver nogle logisk mening, sammen med 0, kodes det til NA. 0 dækker over "its depends"
+ESS18_timing$iaglptn[ESS18_timing$iaglptn == 0 | ESS18_timing$iaglptn == 111] <- NA
+summary(ESS18_timing$iaglptn)
+ggplot(ESS18_timing, aes(iaglptn))+
+  geom_density()
+
+tradtionel_livs_timing$iaglptn <- ESS18_timing$iaglptn
+label(tradtionel_livs_timing$iaglptn) <- "ideal age to start living with partner, not maried"
+```
+
+```{r iagmr - Get married, ideal age. SPLIT BALLOT, message=FALSE, include=F, echo=FALSE}
+summary(ESS18_timing$iagmr)
+ggplot(ESS18_timing, aes(iagmr))+
+  geom_density()
+
+#111 er en stor outlier, som de fjerne jeg, da den ikke giver nogle logisk mening, sammen med 0, kodes det til NA. 0 dækker over "its depends"
+ESS18_timing$iagmr[ESS18_timing$iagmr == 0 | ESS18_timing$iagmr == 111] <- NA
+summary(ESS18_timing$iagmr)
+ggplot(ESS18_timing, aes(iagmr))+
+  geom_density()
+
+tradtionel_livs_timing$iagmr <- ESS18_timing$iagmr
+label(tradtionel_livs_timing$iagmr) <- "ideal age to get married"
+```
+
+
+```{r iagpnt - Become mother/ father, ideal age. SPLIT BALLOT, message=FALSE, include=F, echo=FALSE}
+summary(ESS18_timing$iagpnt)
+ggplot(ESS18_timing, aes(iagpnt))+
+  geom_density()
+
+#120 er en stor outlier, som de fjerne jeg, da den ikke giver nogle logisk mening, sammen med 0, kodes det til NA. 0 dækker over "its depends"
+ESS18_timing$iagpnt[ESS18_timing$iagpnt == 0 | ESS18_timing$iagpnt == 120] <- NA
+summary(ESS18_timing$iagpnt)
+ggplot(ESS18_timing, aes(iagpnt))+
+  geom_density()
+
+tradtionel_livs_timing$iagpnt <- ESS18_timing$iagpnt
+label(tradtionel_livs_timing$iagpnt) <- "ideal age to become parent"
+```
+
+```{r iagrtr - Retire permanently ideal age, message=FALSE, include=F, echo=FALSE}
+summary(ESS18_timing$iagrtr)
+ggplot(ESS18_timing, aes(iagrtr))+
+  geom_density()
+
+#111 og 222 er en store outliers, som dem fjerne jeg, da den ikke giver nogle logisk mening, sammen med 0, kodes det til NA. 0 dækker over "its depends"
+ESS18_timing$iagrtr[ESS18_timing$iagrtr == 0 | ESS18_timing$iagrtr > 100] <- NA
+summary(ESS18_timing$iagrtr)
+ggplot(ESS18_timing, aes(iagrtr))+
+  geom_density()
+
+tradtionel_livs_timing$iagrtr <- ESS18_timing$iagrtr
+label(tradtionel_livs_timing$iagrtr) <- "ideal age to retire permanently"
+```
+
+
+#for ung i alder til livsbegivenheder. 
+```{r tyglvp - Start living with partner not married to age too young, message=FALSE, include=F, echo=FALSE}
+summary(ESS18_timing$tyglvp)
+ggplot(ESS18_timing, aes(tyglvp))+
+  geom_density()
+
+#111 en store outliers, som dem fjerne jeg, da den ikke giver nogle logisk mening, sammen med 0, kodes det til NA. 0 dækker over "its depends"
+ESS18_timing$tyglvp[ESS18_timing$tyglvp == 0 | ESS18_timing$tyglvp > 100] <- NA
+summary(ESS18_timing$tyglvp)
+ggplot(ESS18_timing, aes(tyglvp))+
+  geom_density()
+
+tradtionel_livs_timing$tyglvp <- ESS18_timing$tyglvp
+label(tradtionel_livs_timing$tyglvp) <- "too young to move in with partner, not married"
+```
+
+
+```{r tyglvp - Get married age too young, message=FALSE, include=F, echo=FALSE}
+summary(ESS18_timing$tygmr)
+ggplot(ESS18_timing, aes(tygmr))+
+  geom_density()
+
+#0 kodes det til NA. 0 dækker over "its depends"
+ESS18_timing$tygmr[ESS18_timing$tygmr == 0 | ESS18_timing$tygmr > 100] <- NA
+summary(ESS18_timing$tygmr)
+ggplot(ESS18_timing, aes(tygmr))+
+  geom_density()
+
+tradtionel_livs_timing$tygmr <- ESS18_timing$tygmr
+label(tradtionel_livs_timing$tygmr) <- "too young to get married"
+```
+
+
+```{r tygpnt - become parent too young, message=FALSE, include=F, echo=FALSE}
+summary(ESS18_timing$tygpnt)
+ggplot(ESS18_timing, aes(tygpnt))+
+  geom_density()
+
+#0 kodes det til NA. 0 dækker over "its depends"
+ESS18_timing$tygpnt[ESS18_timing$tygpnt == 0 | ESS18_timing$tygpnt > 100] <- NA
+summary(ESS18_timing$tygpnt)
+ggplot(ESS18_timing, aes(tygpnt))+
+  geom_density()
+
+tradtionel_livs_timing$tygpnt <- ESS18_timing$tygpnt
+label(tradtionel_livs_timing$tygpnt) <- "too young to become parent"
+```
+
+
+
+```{r tygrtr -  age retire too young, message=FALSE, include=F, echo=FALSE}
+summary(ESS18_timing$tygrtr)
+ggplot(ESS18_timing, aes(tygrtr))+
+  geom_density()
+
+#0 og alt over 100 kodes det til NA. 0 dækker over "its depends"
+ESS18_timing$tygrtr[ESS18_timing$tygrtr == 0 | ESS18_timing$tygrtr > 100] <- NA
+summary(ESS18_timing$tygrtr)
+ggplot(ESS18_timing, aes(tygrtr))+
+  geom_density()
+
+tradtionel_livs_timing$tygrtr <- ESS18_timing$tygrtr
+label(tradtionel_livs_timing$tygrtr) <- "age retire too young"
+```
+
+```{r tolvpnt -  age too old to beliving with parents, message=FALSE, include=F, echo=FALSE}
+summary(ESS18_timing$tolvpnt)
+ggplot(ESS18_timing, aes(tolvpnt))+
+  geom_density()
+
+#0 og alt over 100 kodes det til NA. 0 dækker over "its depends"
+ESS18_timing$tolvpnt[ESS18_timing$tolvpnt == 0 | ESS18_timing$tolvpnt > 100] <- NA
+summary(ESS18_timing$tolvpnt)
+ggplot(ESS18_timing, aes(tolvpnt))+
+  geom_density()
+
+tradtionel_livs_timing$tolvpnt <- ESS18_timing$tolvpnt
+label(tradtionel_livs_timing$tolvpnt) <- "age too old to beliving with parents"
+```
+
+```{r tochld -  age too old to have more kids, message=FALSE, include=F, echo=FALSE}
+summary(ESS18_timing$tochld)
+ggplot(ESS18_timing, aes(tochld))+
+  geom_density()
+
+#0 og alt over 100 kodes det til NA. 0 dækker over "its depends"
+ESS18_timing$tochld[ESS18_timing$tochld == 0 | ESS18_timing$tochld > 100] <- NA
+summary(ESS18_timing$tochld)
+ggplot(ESS18_timing, aes(tochld))+
+  geom_density()
+
+tradtionel_livs_timing$tochld <- ESS18_timing$tochld
+label(tradtionel_livs_timing$tochld) <- "age too old to have more kids"
+```
+
+
+```{r towkht -  age too old to be working more than 20 hours a week, message=FALSE, include=F, echo=FALSE}
+summary(ESS18_timing$towkht)
+ggplot(ESS18_timing, aes(towkht))+
+  geom_density()
+
+#0 og alt over 100 kodes det til NA. 0 dækker over "its depends"
+ESS18_timing$towkht[ESS18_timing$towkht == 0 | ESS18_timing$towkht > 100] <- NA
+summary(ESS18_timing$towkht)
+ggplot(ESS18_timing, aes(towkht))+
+  geom_density()
+
+tradtionel_livs_timing$towkht <- ESS18_timing$towkht
+label(tradtionel_livs_timing$towkht) <- "age too old to be working more than 20 hours a week"
+```
+
+#hvorvidt man "approves" andre folks livs valg
+likert skala, 1-5, Strongly disapprove til Strongly approve
+integer class
+```{r hvorvidt man "approves" andre folks livs valg}
+summary(ESS18_timing$anvcld)
+summary(ESS18_timing$alvgptn)
+summary(ESS18_timing$acldnmr)
+summary(ESS18_timing$aftjbyc)
+summary(ESS18_timing$advcyc)
+#ikke behov for at kode noget om.
+
+
+tradtionel_livs_timing$anvcld <- ESS18_timing$anvcld
+tradtionel_livs_timing$alvgptn <- ESS18_timing$alvgptn
+tradtionel_livs_timing$acldnmr <- ESS18_timing$acldnmr
+tradtionel_livs_timing$aftjbyc <- ESS18_timing$aftjbyc
+tradtionel_livs_timing$advcyc <- ESS18_timing$advcyc
+
+
+
+
+label(tradtionel_livs_timing$anvcld) <- "Approve if person chooses never to have children"
+label(tradtionel_livs_timing$alvgptn) <- "Approve if person lives with partner not married to"
+label(tradtionel_livs_timing$acldnmr) <- "Approve if person have child with partner not married to"
+label(tradtionel_livs_timing$aftjbyc) <- "Approve if person has full-time job while children aged under 3"
+label(tradtionel_livs_timing$advcyc) <- "Approve if person gets divorced while children aged under 12"
+```
+#planlægger eller tager ting som kommer
+```{r plnftr - Plan for future or take each day as it comes, message=FALSE, include=F, echo=FALSE}
+summary(ESS18_timing$plnftr)
+ggplot(ESS18_timing, aes(plnftr))+
+  geom_density()
+#ikke behov for at ændre noget
+tradtionel_livs_timing$plnftr <- ESS18_timing$plnftr
+label(tradtionel_livs_timing$plnftr) <- "plan for the future or take each day at a time"
+```
+
+#afslutning
+```{r save dataset}
+write.csv(tradtionel_livs_timing, file = ("../tema datasæt/tradtionel_livs_timing.csv"), row.names = FALSE)
+```
+
+```{r}
+
+```
+

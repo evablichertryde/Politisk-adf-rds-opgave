@@ -1,0 +1,369 @@
+---
+title: "parti variables"
+output: htlm_notebook
+editor_options: 
+  chunk_output_type: inline
+header-includes:
+    - \usepackage{setspace}\doublespacing
+    - \usepackage{booktabs} 
+    - \usepackage{tabularx}
+    - \usepackage{tidy}
+output:   
+  bookdown::pdf_document2:
+  fig_caption: true
+  fontsize: 10.5pt
+---
+```{r hente-pakker, message=FALSE, include=FALSE, echo=FALSE}
+library(dplyr) # Kan rense det nye data
+library(tidyr)
+library(stringr) # Til arbejde med string-data
+library(ggplot2) # Til visualisering af resultater
+library(viridis)
+library(lubridate)
+library(ggpubr) # Flere plots sammen
+library(openxlsx) # Kan loade og gemme excel
+library(ggpubr)
+library(tidyverse)
+library(haven) # til at åbne datasæt 
+library(Hmisc)
+library(sjlabelled) # to convert party vote choice into names
+library(data.table) # for the "fread" function to quickly load large csv files
+library(manifestoR)
+```
+
+
+##åbne data 
+data fra 2018
+```{r åben data, include=FALSE, echo=FALSE}
+ESS18_politics<- read.csv("../tema datasæt/ESS18_politics.csv")
+ESS18<- read.csv("../original data/ESS18.csv")
+```
+
+```{r}
+country <- ESS18 %>%
+  select(id, cntry, essround)
+```
+
+```{r}
+ESS18_politics <- full_join(ESS18_politics, country)
+```
+```{r}
+ESS18 <- ESS18 %>%
+  select(subset = -c(prtvede2, prtvblt2, prtvblt3))
+```
+
+
+
+```{r}
+es.df.clean <- function(x){
+  esx <- x %>% select("essround", # REQUIRED: essround
+                      "idno", # REQUIRED: respondent ID
+                      "cntry", # REQUIRED: country 
+                      starts_with("inw"), # REQUIRED: interview date (to match vote recall to specific election)
+                      "gndr" , # gender
+                      "agea", # age
+                      starts_with("edulvl"), # educational attainment (several vars)
+                      starts_with("isco"), # occupation
+                      starts_with("prtv"), # party vote
+                      -ends_with("de1"), # drop 1st German vote intention var
+  ) %>% 
+    as.data.frame()
+  # find FIRST country-specific vote variable
+  start <- head(grep("prtv", colnames(esx)), n=1)
+  # find LAST country-specific vote variable
+  end <- tail(grep("prtv", colnames(esx)), n=1)
+  # mini dataset of party choice vars
+  es.vote <- esx %>% select(start:end)
+  # create dataset-wide vote variable by merging the country-specific vars
+  esx$party.vote.num <- as.vector(do.call(coalesce, es.vote))
+  # convert numeric values into party names
+  es.vote.named <- as_label(es.vote)
+  # convert factors into characters to make sure they're stored properly
+  es.vote.named[] <- lapply(es.vote.named, as.character)
+  # create another dataset-wide vote variable, this time for the character variable
+  esx$party.vote.name <- as.vector(do.call(coalesce, es.vote.named))
+  # convert to UTF encoding to deal with special characters
+  # delete unnecessary variables
+  start <- head(grep("prtvt", colnames(esx)), n=1)
+  end <- tail(grep("prtvt", colnames(esx)), n=1)
+  esx <- esx %>% select(-(start:end))
+  esx
+}
+```
+
+
+```{r}
+ess <- es.df.clean(ESS18)
+```
+
+```{r}
+tabl <- function(...) table(..., useNA='ifany')
+```
+
+
+```{r}
+partyfacts <- read.csv("../../../sophie parti/ess-partyfacts-extended.csv")
+```
+
+```{r}
+partyfacts_9 <- partyfacts%>%
+  filter(essround == 9)
+tabl(partyfacts_9$cntry)
+```
+
+
+```{r}
+ess$party.vote.ess <- ifelse(is.na(ess$party.vote.num), NA,
+                             paste0(ess$cntry, "-", ess$essround, "-", ess$party.vote.num))
+```
+
+
+```{r}
+partyfacts$party.vote.ess <- paste0(partyfacts$cntry, "-", partyfacts$essround, "-", partyfacts$ess_id)
+partyfacts <- partyfacts %>% select(party.vote.ess, partyfacts_id, partyfacts_name)
+```
+
+
+```{r}
+ess <- left_join(ess, partyfacts, by=c("party.vote.ess"))
+
+```
+
+```{r}
+ess <- mutate(ess, id = rownames(ess))
+```
+
+
+```{r}
+cmp <- read_dta("../../../all manifesto data/all manifesto r project/data/MPDS2020a.dta")
+```
+
+
+```{r}
+# create election year variable
+cmp$election.year <- as.numeric(as.character(substr(cmp$date, 1, 4)))
+# create econ l-r and lib-auth scales, following Bakker & Hobolt (2013)
+cmp <- cmp %>% mutate(econlr = scale_logit(data=cmp,
+                                           pos=c("per401", "per402", "per407", "per505", 
+                                                 "per507", "per410", "per414", "per702"), 
+                                           neg=c("per403", "per404", "per406", "per504", 
+                                                 "per506", "per413", "per412", "per701", 
+                                                 "per405", "per409", "per415", "per503"),
+                                           zero_offset = 0.5))
+
+cmp <- cmp %>% mutate(econlr.sal = (per401 + per402 + per407 + per505 + per507 + per410 + per414 + per702) +
+                        (per403 + per404 + per406 + per504 + per506 + per413 + per412 + per701 + per405 + per409 + per415 + per503))
+
+
+summary(cmp$econlr.sal)
+
+cmp <- cmp %>% mutate(auth = scale_logit(data=cmp,
+                                         pos=c("per305", "per601", "per603", "per605", 
+                                               "per608", "per606"), 
+                                         neg=c("per501", "per602", "per604", "per502", 
+                                               "per607", "per416", "per705", "per706", 
+                                               "per201", "per202"),
+                                         zero_offset = 0.5))
+
+```
+```{r, include=FALSE, echo=FALSE}
+cw_pf <- read_csv(url("https://partyfacts.herokuapp.com/download/external-parties-csv/"))
+cw_pf$dataset_party_id <- as.numeric(as.character(cw_pf$dataset_party_id))
+cw_pf_cmp <- cw_pf %>% filter(dataset_key == "manifesto") %>% select(partyfacts_id, dataset_party_id)
+ess <- mutate(ess, id_ess = rownames(ess))
+```
+
+
+```{r, include=FALSE, echo=FALSE}
+names(cw_pf_cmp) <- c("partyfacts_id", "cmp_id")
+
+ess <- left_join(ess, cw_pf_cmp, by=c("partyfacts_id"))
+```
+
+
+```{r}
+ess_id <- ess %>%
+  group_by(id_ess)%>%
+  summarise(n = n())%>%
+  ungroup()
+table(ess_id$n)
+```
+
+
+
+```{r åbne data, include=FALSE, echo=FALSE}
+ess_dates <- read_csv(url("https://raw.githubusercontent.com/denis-cohen/ess-election-dates/master/ess_election_dates.csv"))
+# select needed vars
+ess_dates <- ess_dates %>% select(cntry, essround, recent_election, recent_election_split1)
+```
+
+```{r}
+ess_dates <- subset(ess_dates, cntry !="BG" & essround == 9)
+```
+
+
+```{r}
+ess_dates <- rbind(ess_dates, c("BG", 9, "2017-03-26", NA))
+ess_dates <- rbind(ess_dates, c("ES", 9, "2016-06-26", NA))
+ess_dates <- rbind(ess_dates, c("LT", 9, "2016-10-09", NA))
+ess_dates <- rbind(ess_dates, c("PT", 9, "2015-10-04", NA))
+ess_dates <- rbind(ess_dates, c("SE", 9, "2014-09-04", NA))
+ess_dates <- rbind(ess_dates, c("HR", 9, "2016-09-11", NA))
+ess_dates <- rbind(ess_dates, c("LV", 9, "2014-10-04", NA))#Latvia
+ess_dates <- rbind(ess_dates, c("ME", 9, "2016-10-16", NA))#Montenegro
+ess_dates <- rbind(ess_dates, c("RS", 9, "2016-04-24", NA))#Serbia
+ess_dates <- rbind(ess_dates, c("SK", 9, "2016-03-05", NA))#Slovakia
+```
+
+```{r}
+ess_dates$essround <- as.integer(ess_dates$essround)
+```
+
+
+
+```{r åbne data, include=FALSE, echo=FALSE}
+# merge in
+ess <- left_join(ess, ess_dates, by=c("cntry", "essround"))
+
+# create a variable indicating date of interview for each respondent
+# first create day/month/year variables consistent across rounds
+# from ESS Round 3 onwards, they give us the start (inwdds) AND end date (inwdde) of the interview
+# here I am taking the start date as our reference point
+# I *think* the politics module occurs fairly early during the survey
+# Alternatively we coulld take the midpoint, or use the end date? 
+ess <- ess %>% mutate(int.day = case_when(
+                                          essround>2 ~ inwdds)) %>%
+              mutate(int.month = case_when(
+                                          essround>2 ~ inwmms)) %>%
+              mutate(int.year = case_when(
+                                          essround>2 ~ inwyys))
+ess <- ess %>% mutate(int.date = as.Date(paste(int.year, int.month, int.day, sep="-")))
+tabl(ess$int.date)
+```
+
+
+
+
+```{r}
+# for each respondent, let's define their "most recent election", based on start interview date
+ess <- ess %>% mutate(ref.election = case_when(int.date > recent_election ~ recent_election,
+                                               int.date <= recent_election ~ recent_election_split1))
+tabl(ess$ref.election)
+```
+
+```{r}
+ess$ref.election[ess$cntry == "BG"] <- as.Date("2017-03-26")
+ess$ref.election[ess$cntry == "RS"] <- as.Date("2016-04-24")
+ess$ref.election[ess$cntry == "HR"] <- as.Date("2016-09-11")
+ess$ref.election[ess$cntry == "SI"] <- as.Date("2018-06-03")
+ess$ref.election[ess$cntry == "SK"] <- as.Date("2016-03-05")
+ess$ref.election[ess$cntry == "ME"] <- as.Date("2016-10-16")
+ess$ref.election[ess$cntry == "ES"] <- as.Date("2016-06-26")
+ess$ref.election[ess$cntry == "LT"] <- as.Date("2016-10-09")
+ess$ref.election[ess$cntry == "PT"] <- as.Date("2015-10-04")
+ess$ref.election[ess$cntry == "SE"] <- as.Date("2014-09-04")
+ess$ref.election[ess$cntry == "LV"] <- as.Date("2014-10-04")
+
+tabl(ess$ref.election, ess$cntry)
+```
+
+
+
+```{r}
+cmp <- cmp %>% mutate(auth.sal = (per305 + per601 + per603 + per605 + per608  + per606) +
+                        (per501 + per602 + per604 + per502 + per607 + per416 + per705 + per706 + per201 + per202))
+# select party code, party family
+# as well as party-election specific variables like right/left coding of the manifesto
+cmp.x <- cmp %>% select(party, parfam, election.year, edate, rile, 
+                        econlr, econlr.sal, auth, auth.sal)
+names(cmp.x)[1:2] <- c("cmp_id", "cmp_parfam") # relabel for clarity
+head(cmp.x)
+ess$election.year <- as.numeric(as.character(substr(ess$ref.election, 1, 4)))
+tabl(ess$election.year)
+# match up by election year
+# N.B. this won't work for cases where two elections happen in the same year, and ESS fieldwork window covers the 2nd election
+ess <- left_join(ess, cmp.x, by=c("cmp_id", "election.year"))
+# alternatively we could match on exact election date
+# cmp.x$election.date <- as.Date(cmp.x$edate)
+# ess$election.date <- as.Date(ess$ref.election)
+# ess <- left_join(ess, cmp.x, by=c("cmp_id", "election.date")
+```
+
+```{r}
+ess <- ess %>%
+  filter(election.year != "NA")
+tabl(ess$cntry, ess$election.year)
+
+```
+
+
+```{r}
+cmp.x$election.date <- as.Date(cmp.x$edate)
+ess$election.date <- as.Date(ess$ref.election)
+ess <- left_join(ess, cmp.x, by=c("cmp_id", "election.date"))
+
+# create left vote recall based on party families
+# 10 = ecological
+# 20 = socialist or other left
+# 30 = social democratic
+#ess$vote.left <- ifelse(ess$cmp_parfam==10 | ess$cmp_parfam==20 | ess$cmp_parfam==30, 1, 0)
+#tabl(ess$vote.left)
+
+names(ess)
+
+head(ess)
+```
+
+
+```{r}
+essx <- ess %>% select(idno, id, cntry, essround, int.date,
+                       party.vote.ess, partyfacts_id, partyfacts_name,
+                       cmp_id, cmp_parfam.x, ref.election,
+                       election.year.x, edate.x, rile.x,
+                       econlr.x, econlr.sal.x, auth.x, auth.sal.x) %>% 
+                       as.data.frame()
+```
+
+```{r}
+essx_id <- essx %>%
+  group_by(idno)%>%
+  summarise(n = n())%>%
+  ungroup()
+table(essx_id$n)
+```
+
+```{r}
+parti <- essx
+```
+
+
+fjerne dupliter på id variablen
+```{r}
+parti = parti[!duplicated(parti$id),]
+```
+
+```{r}
+parti$id <- as.numeric(parti$id)
+```
+
+
+```{r}
+write.csv(parti, file = "../tema datasæt/parti.csv")
+```
+
+
+
+```{r}
+
+```
+
+
+
+
+
+
+
+
+
+
+

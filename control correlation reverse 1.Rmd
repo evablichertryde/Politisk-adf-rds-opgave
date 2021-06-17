@@ -1,0 +1,192 @@
+---
+title: "control correlation Reverse 1"
+output: htlm_notebook
+editor_options: 
+  chunk_output_type: inline
+header-includes:
+    - \usepackage{setspace}\doublespacing
+    - \usepackage{booktabs} 
+    - \usepackage{tabularx}
+    - \usepackage{tidy}
+output:   
+  bookdown::pdf_document2:
+  fig_caption: true
+  fontsize: 10.5pt
+---
+
+## Hente pakker
+
+```{r hente-pakker, message=FALSE, include=FALSE, echo=FALSE}
+library(dplyr) # Kan rense det nye data
+library(tidyr)
+library(stringr) # Til arbejde med string-data
+library(ggplot2) # Til visualisering af resultater
+library(tidyverse) #datoer
+library(haven) # til at åbne datasæt 
+library(Hmisc)
+library(corrr)
+library(xtable)
+library(jtools)
+library(weights)
+library(broom)
+library(purrr)
+```
+
+## Åbne Data
+
+```{r}
+PVQ<- read.csv("../tema datasæt/PVQ_r.csv")
+ESS18<- read.csv("../original data/ESS18.csv")
+ESS18_control<- read.csv("../tema datasæt/ESS18_control.csv")
+```
+
+```{r}
+weights <- ESS18 %>%
+  select(psu, stratum, anweight, id, cntry)
+write.csv(weights, file = ("../tema datasæt/weights.csv"))
+```
+
+```{r, include=FALSE, echo=FALSE}
+ESS18_control <- left_join(ESS18_control, PVQ, by = "id")
+ESS18_control <- left_join(ESS18_control, weights, by = "id")
+```
+
+```{r}
+ESS18_control <- ESS18_control %>%
+  filter(PVQ != "NA")
+```
+
+```{r}
+rm(ESS18, PVQ, weights)
+```
+
+```{r}
+table(ESS18_control$cntry)
+```
+
+
+# Brugbar kode
+
+## Nesting og korrelation af data
+
+gather data, så dataen er i lang format
+
+```{r}
+data_1 <- gather(ESS18_control, Autho, values, PVQ:Norris)%>%
+  gather(control, con_value, eisced:stfeco)
+data_1 <- data_1%>%
+  select(c(cntry, anweight, Autho, values, control, con_value))%>%
+  mutate(con_value = as.numeric(con_value))
+data_1 <- na.omit(data_1)
+```
+
+```{r}
+data_nest <- group_by(data_1, Autho, control, cntry) %>% nest()
+```
+
+## Funktion med vejet korrelation
+
+```{r}
+cor_fun <- function(df){
+  name <- as.data.frame(wtd.cor(df$values, df$con_value, df$anweight))
+    name$p.value <- round(name$p.value, digits = 5)
+  return(name)
+}
+```
+
+Korrelation for alle lande samlet
+
+```{r}
+data_nest_all <- group_by(data_1, Autho, control) %>% nest()
+data_nest_all1 <- mutate(data_nest_all, model = map(data, cor_fun))
+corr_pr_all <- select(data_nest_all1, -data) %>% unnest()
+corr_pr_all$cntry <- "All"
+```
+
+## Datasæt med korrelation
+
+indholder korrelationer på landeniveau, mellem kontrol variabler og et autoritærisme mål.
+
+```{r}
+data_nest1 <- mutate(data_nest, model = map(data, cor_fun))
+corr_pr <- select(data_nest1, -data) %>% unnest()
+
+corr_pr <- bind_rows(corr_pr_all, corr_pr)
+rm(corr_pr_all, data_nest, data_1, data_nest1, data_nest_all, data_nest_all1)
+```
+
+```{r}
+corr_all <- corr_pr %>%
+  filter(cntry == "All")
+```
+
+## Sammenlign retning og signifikans
+
+lande samlignet med alle lande
+
+```{r}
+lande_fht_all_dir<- function(df){
+
+df$direction[df$control == "eisced" & df$cntry != "All" & df$correlation >= 0] <- FALSE
+df$direction[df$control == "eisced" & df$cntry != "All" & df$correlation < 0] <- TRUE
+
+df$direction[df$control == "Hincsrca" & df$cntry != "All" & df$correlation >= 0] <- FALSE
+df$direction[df$control == "Hincsrca" & df$cntry != "All" & df$correlation < 0] <- TRUE
+
+df$direction[df$control == "hincfel" & df$cntry != "All" & df$correlation <= 0] <- FALSE
+df$direction[df$control == "hincfel" & df$cntry != "All" & df$correlation > 0] <- TRUE
+
+df$direction[df$control == "hinctnta" & df$cntry != "All" & df$correlation >= 0] <- FALSE
+df$direction[df$control == "hinctnta" & df$cntry != "All" & df$correlation < 0] <- TRUE
+
+df$direction[df$control == "domicil" & df$cntry != "All" & df$correlation <= 0] <- FALSE
+df$direction[df$control == "domicil" & df$cntry != "All" & df$correlation > 0] <- TRUE
+
+df$direction[df$control == "agea" & df$cntry != "All" & df$correlation <= 0] <- FALSE
+df$direction[df$control == "agea" & df$cntry != "All" & df$correlation > 0] <- TRUE
+
+df$direction[df$control == "rlgdgr" & df$cntry != "All" & df$correlation <= 0] <- FALSE
+df$direction[df$control == "rlgdgr" & df$cntry != "All" & df$correlation > 0] <- TRUE
+
+df$direction[df$control == "stfeco" & df$cntry != "All" & df$correlation >= 0] <- FALSE
+df$direction[df$control == "stfeco" & df$cntry != "All" & df$correlation < 0] <- TRUE
+return(df)
+}
+
+
+lande_fht_all_sig<- function(df){
+df$sig[df$direction == TRUE & df$cntry != "All" & df$p.value <= 0.05] <- TRUE
+df$sig[df$direction == TRUE & df$cntry != "All" & df$p.value > 0.05] <- FALSE
+df$sig[df$direction == FALSE] <- FALSE
+
+return(df)
+}
+```
+
+```{r}
+corr_pr <- lande_fht_all_dir(corr_pr)
+corr_pr <- lande_fht_all_sig(corr_pr)
+```
+
+```{r}
+rm(lande_fht_all_dir, lande_fht_all_sig, corr_all, cor_fun)
+```
+
+### datasæt med retning for lande ift. generelt
+
+```{r}
+aut_dir <- corr_pr %>%
+  filter(cntry != "All") %>%
+  group_by(control, Autho) %>% 
+  tally(direction)
+
+aut_sig <- corr_pr %>%
+  filter(cntry != "All") %>%
+  group_by(control, Autho) %>% 
+  tally(sig)
+
+```
+
+```{r}
+
+```

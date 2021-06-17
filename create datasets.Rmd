@@ -1,0 +1,39 @@
+---
+title: "create datasets"
+output: html_notebook
+editor_options: 
+  chunk_output_type: inline
+header-includes:
+    - \usepackage{setspace}\doublespacing
+    - \usepackage{booktabs} 
+    - \usepackage{tabularx}
+    - \usepackage{tidy}
+output:   
+  bookdown::pdf_document2:
+  fig_caption: true
+  fontsize: 10.5pt
+---
+```{r hente-pakker, message=FALSE, include=FALSE, echo=FALSE}
+library(dplyr) # Kan rense det nye data
+library(tidyr)
+library(stringr) # Til arbejde med string-data
+library(ggplot2) # Til visualisering af resultater
+library(viridis)
+library(lubridate)
+library(ggpubr) # Flere plots sammen
+library(openxlsx) # Kan loade og gemme excel
+library(ggpubr)
+library(tidyverse)
+library(haven) # til at åbne datasæt 
+library(Hmisc)
+```
+
+```{r}
+ESS18_timing<- read.csv("../tema datasæt/ESS18_timing.csv")
+tradtionel_livs_timing <- ESS18_timing%>%
+  select(idno)
+write.csv(tradtionel_livs_timing, file = ("../tema datasæt/tradtionel_livs_timing.csv"))
+```
+
+
+ 

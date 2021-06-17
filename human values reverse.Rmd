@@ -1,0 +1,108 @@
+---
+title: "human values reverse"
+output: htlm_notebook
+editor_options: 
+  chunk_output_type: inline
+output:   
+  bookdown::pdf_document2:
+  fig_caption: true
+  fontsize: 10.5pt
+---
+
+skal bruges til authoritær index. 
+```{r hente-pakker, message=FALSE, include=FALSE, echo=FALSE}
+library(dplyr) # Kan rense det nye data
+library(tidyr)
+library(stringr) # Til arbejde med string-data
+library(ggplot2) # Til visualisering af resultater
+library(viridis)
+library(lubridate)
+library(ggpubr) # Flere plots sammen
+library(openxlsx) # Kan loade og gemme excel
+library(ggpubr)
+library(tidyverse)
+library(haven) # til at åbne datasæt 
+library(Hmisc)
+library(corrr)
+library(corrplot)
+library(scales)
+```
+
+
+##åbne data 
+data fra 2018
+```{r åben data, message=FALSE, include=F, echo=FALSE}
+ESS18_values <- read.csv("../tema datasæt/ESS18_values.csv")
+```
+
+```{r}
+values <- ESS18_values %>%
+  select(-c(X))
+#values <- na.omit(values)
+```
+
+
+```{r}
+values.ess <- values %>%
+  rename(v1 = ipcrtiv, v2 =imprich, v3 = ipeqopt, v4 = ipshabt, v5 = impsafe, v6 = impdiff, v7 = ipfrule, v8 = ipudrst, v9 = ipmodst, v10 = ipgdtim, v11 = impfree, v12 = iphlppl, v13 = ipsuces, v14 = ipstrgv, v15 = ipadvnt, v16 = ipbhprp, v17 = iprspot, v18 = iplylfr, v19 = impenv, v20 = imptrad, v21 = impfun)
+```
+
+```{r}
+Flip <- function(x) 6 - x
+values.ess_r <- mutate_at(values.ess,.vars = -c(1), Flip )
+
+```
+
+
+databehandling som krævet af ESS schwartz
+```{r}
+values.ess_r <- values.ess_r %>%
+ na.omit()%>% #dropper na - misted 4000 observationer
+  rowwise()%>%
+  mutate(security = sum(c(v5, v14)), 
+         conformity = sum(c(v7, v16)),
+         tradition = sum(c(v9, v20)),
+         selfdirection = sum(c(v1, v11)),
+         stimulation = sum(c(v6, v15)),
+         hedonism = sum(c(v10, v21)),
+         Norris = sum(c(v5, v7, v16, v14, v20)))
+#mrat =mean(c(v1:v21), na.rm=TRUE),
+```
+
+
+```{r}
+values.ess_r <- values.ess_r%>%
+  rowwise()%>%
+  mutate(conservation_1 = sum(c(conformity, tradition, security)), 
+         conservation_2 = sum(c(conformity, tradition)),
+         opneness = sum(c(selfdirection, stimulation)))
+```
+
+
+
+
+```{r}
+values.ess_r <- values.ess_r %>%
+  rowwise()%>%
+  mutate(PVQ = conservation_1-opneness, Feldman = conservation_2-opneness)%>%
+  ungroup
+```
+
+
+```{r, message=FALSE, include=FALSE, echo=FALSE}
+values.ess_r$PVQ <- scales::rescale(values.ess_r$PVQ, to = c(0,10))
+values.ess_r$Feldman <- scales::rescale(values.ess_r$Feldman, to = c(0,10))
+values.ess_r$Norris <- scales::rescale(values.ess_r$Norris, to = c(0,10))
+```
+
+
+```{r, message=FALSE, include=FALSE, echo=FALSE}
+PVQ_r <- values.ess_r %>%
+  select(id, conservation_1, conservation_2, opneness, PVQ, Feldman, Norris)
+```
+
+```{r}
+write.csv(PVQ_r, file = "../tema datasæt/PVQ_r.csv")
+
+```
+

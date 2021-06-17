@@ -1,0 +1,577 @@
+---
+title: "control correlation"
+output: htlm_notebook
+editor_options: 
+  chunk_output_type: inline
+header-includes:
+    - \usepackage{setspace}\doublespacing
+    - \usepackage{booktabs} 
+    - \usepackage{tabularx}
+    - \usepackage{tidy}
+output:   
+  bookdown::pdf_document2:
+  fig_caption: true
+  fontsize: 10.5pt
+---
+```{r hente-pakker, message=FALSE, include=FALSE, echo=FALSE}
+library(dplyr) # Kan rense det nye data
+library(tidyr)
+library(stringr) # Til arbejde med string-data
+library(ggplot2) # Til visualisering af resultater
+library(viridis)
+library(lubridate)
+library(ggpubr) # Flere plots sammen
+library(openxlsx) # Kan loade og gemme excel
+library(ggpubr)
+library(tidyverse)
+library(haven) # til at åbne datasæt 
+library(Hmisc)
+library(scales)
+library(corrr)
+library(xtable)
+library(jtools)
+library(weights)
+```
+
+```{r}
+PVQ<- read.csv("../tema datasæt/PVQ.csv")
+ESS18<- read.csv("../original data/ESS18.csv")
+ESS18_control<- read.csv("../tema datasæt/ESS18_control.csv")
+```
+
+
+```{r}
+weights <- ESS18 %>%
+  select(psu, stratum, anweight, id)
+write.csv(weights, file = ("../tema datasæt/weights.csv"))
+
+```
+
+
+```{r}
+country <- ESS18 %>%
+  select(id, cntry)
+```
+
+
+```{r, include=FALSE, echo=FALSE}
+ESS18_control <- left_join(ESS18_control, PVQ, by = "id")
+ESS18_control <- left_join(ESS18_control, country, by = "id")
+ESS18_control <- left_join(ESS18_control, weights, by = "id")
+```
+
+```{r}
+ESS18_control <- ESS18_control %>%
+  filter(PVQ != "NA")
+```
+
+
+PVQ
+
+```{r}
+country_df <- function(df, col_name, value){
+  df <- df%>%
+    filter({{col_name}} == {{value}})
+  return(df)}
+
+country_correlation <- function(df, x){
+  correlation_edd <- as.data.frame(wtd.cor(df$PVQ, as.numeric(df$eisced), df$anweight))
+  correlation_edd$variable <- "edd"
+  
+ correlation_hincfel <- as.data.frame(wtd.cor(df$PVQ, as.numeric(df$hincfel), df$anweight))
+correlation_hincfel$variable <- "hincfel"
+
+correlation_hinctnta <- as.data.frame(wtd.cor(df$PVQ, as.numeric(df$hinctnta), df$anweight))
+correlation_hinctnta$variable <- "hinctnta"
+
+  correlation_domicil <- as.data.frame(wtd.cor(df$PVQ, as.numeric(df$domicil), df$anweight))
+  correlation_domicil$variable <- "domicil"
+  correlation_agea <- as.data.frame(wtd.cor(df$PVQ, as.numeric(df$agea), df$anweight))
+  correlation_agea$variable <- "agea"
+  correlation_rlgdgr <- as.data.frame(wtd.cor(df$PVQ, as.numeric(df$rlgdgr), df$anweight))
+  correlation_rlgdgr$variable <- "rlgdgr"
+  correlation_stfeco <- as.data.frame(wtd.cor(df$PVQ, as.numeric(df$stfeco), df$anweight))
+  correlation_stfeco$variable <- "stfeco"
+  
+  name <- bind_rows(correlation_edd, correlation_hincfel, correlation_hinctnta, correlation_domicil, correlation_agea, correlation_rlgdgr, correlation_stfeco)
+  name$country <- {{x}}
+  name$p.value <- round(name$p.value, digits = 3)
+  return(name)
+}
+```
+
+
+```{r}
+correlation_PVQ <- country_correlation(ESS18_control, x = "all")
+
+df_at <- country_df(ESS18_control, cntry, "AT")
+at_correlation <- country_correlation(df_at, x = "AT")
+
+df_be <- country_df(ESS18_control, cntry, "BE")
+be_correlation <- country_correlation(df_be, x = "BE")
+
+df_bg <- country_df(ESS18_control, cntry, "BG")
+bg_correlation <- country_correlation(df_bg, x = "BG")
+
+df_ch <- country_df(ESS18_control, cntry, "CH")
+ch_correlation <- country_correlation(df_ch, x = "CH")
+
+df_cy <- country_df(ESS18_control, cntry, "CY")
+cy_correlation <- country_correlation(df_cy, x = "CY")
+
+df_cz <- country_df(ESS18_control, cntry, "CZ")
+cz_correlation <- country_correlation(df_cz, x = "CZ")
+
+df_de <- country_df(ESS18_control, cntry, "DE")
+de_correlation <- country_correlation(df_de, x = "DE")
+
+df_ee <- country_df(ESS18_control, cntry, "EE")
+ee_correlation <- country_correlation(df_ee, x = "EE")
+
+df_es <- country_df(ESS18_control, cntry, "ES")
+es_correlation <- country_correlation(df_es, x = "ES")
+
+df_fi <- country_df(ESS18_control, cntry, "FI")
+fi_correlation <- country_correlation(df_fi, x = "FI")
+
+df_fr <- country_df(ESS18_control, cntry, "FR")
+fr_correlation <- country_correlation(df_fr, x = "FR")
+
+df_gb <- country_df(ESS18_control, cntry, "GB")
+gb_correlation <- country_correlation(df_gb, x = "GB")
+
+df_hr <- country_df(ESS18_control, cntry, "HR")
+hr_correlation <- country_correlation(df_hr, x = "HR")
+
+df_hu <- country_df(ESS18_control, cntry, "HU")
+hu_correlation <- country_correlation(df_hu, x = "HU")
+
+df_ie <- country_df(ESS18_control, cntry, "IE")
+ie_correlation <- country_correlation(df_ie, x = "IE")
+
+df_it <- country_df(ESS18_control, cntry, "IT")
+it_correlation <- country_correlation(df_it, x = "IT")
+
+df_lt <- country_df(ESS18_control, cntry, "LT")
+lt_correlation <- country_correlation(df_lt, x = "LT")
+
+df_lv <- country_df(ESS18_control, cntry, "LV")
+lv_correlation <- country_correlation(df_lv, x = "LV")
+
+df_me <- country_df(ESS18_control, cntry, "ME")
+me_correlation <- country_correlation(df_me, x = "ME")
+
+df_nl <- country_df(ESS18_control, cntry, "NL")
+nl_correlation <- country_correlation(df_nl, x = "NL")
+
+df_no <- country_df(ESS18_control, cntry, "NO")
+no_correlation <- country_correlation(df_no, x = "NO")
+
+df_pl <- country_df(ESS18_control, cntry, "PL")
+pl_correlation <- country_correlation(df_pl, x = "PL")
+
+df_pt <- country_df(ESS18_control, cntry, "PT")
+pt_correlation <- country_correlation(df_pt, x = "PT")
+
+df_rs <- country_df(ESS18_control, cntry, "RS")
+rs_correlation <- country_correlation(df_rs, x = "RS")
+
+df_se <- country_df(ESS18_control, cntry, "SE")
+se_correlation <- country_correlation(df_se, x = "SE")
+
+df_si <- country_df(ESS18_control, cntry, "SI")
+si_correlation <- country_correlation(df_si, x = "SI")
+
+df_sk <- country_df(ESS18_control, cntry, "SK")
+sk_correlation <- country_correlation(df_sk, x = "SK")
+```
+
+```{r}
+correlation_PVQ <- bind_rows(correlation_PVQ, at_correlation, be_correlation, bg_correlation, ch_correlation, cy_correlation, cz_correlation, de_correlation, ee_correlation, es_correlation, fi_correlation, fr_correlation, gb_correlation, hr_correlation, hu_correlation, ie_correlation, it_correlation, lt_correlation, lv_correlation, me_correlation, nl_correlation, no_correlation, pl_correlation, pt_correlation, rs_correlation, se_correlation, si_correlation, sk_correlation)
+
+```
+
+```{r}
+rm(at_correlation, be_correlation, bg_correlation, ch_correlation, cy_correlation, cz_correlation, de_correlation, ee_correlation, es_correlation, fi_correlation, fr_correlation, gb_correlation, hr_correlation, hu_correlation, ie_correlation, it_correlation, lt_correlation, lv_correlation, me_correlation, nl_correlation, no_correlation, pl_correlation, pt_correlation, rs_correlation, se_correlation, si_correlation, sk_correlation, df_at, df_be, df_bg, df_ch, df_cy, df_cz, df_de, df_ee, df_es, df_fi, df_fr, df_gb, df_hr, df_hu, df_ie, df_it, df_lt, df_lv, df_me, df_nl, df_no, df_pl, df_pt, df_rs, df_se, df_si, df_sk)
+```
+
+
+NORRIS
+
+```{r}
+country_norris <- function(df, col_name, value){
+  df <- df%>%
+    filter({{col_name}} == {{value}})
+  return(df)}
+
+country_Norris_correlation <- function(df, x){
+  correlation_edd <- as.data.frame(wtd.cor(df$Norris, as.numeric(df$eisced), df$anweight))
+  correlation_edd$variable <- "edd"
+  
+ correlation_hincfel <- as.data.frame(wtd.cor(df$Norris, as.numeric(df$hincfel), df$anweight))
+correlation_hincfel$variable <- "hincfel"
+
+correlation_hinctnta <- as.data.frame(wtd.cor(df$Norris, as.numeric(df$hinctnta), df$anweight))
+correlation_hinctnta$variable <- "hinctnta"
+
+  correlation_domicil <- as.data.frame(wtd.cor(df$Norris, as.numeric(df$domicil), df$anweight))
+  correlation_domicil$variable <- "domicil"
+  correlation_agea <- as.data.frame(wtd.cor(df$Norris, as.numeric(df$agea), df$anweight))
+  correlation_agea$variable <- "agea"
+  correlation_rlgdgr <- as.data.frame(wtd.cor(df$Norris, as.numeric(df$rlgdgr), df$anweight))
+  correlation_rlgdgr$variable <- "rlgdgr"
+  correlation_stfeco <- as.data.frame(wtd.cor(df$Norris, as.numeric(df$stfeco), df$anweight))
+  correlation_stfeco$variable <- "stfeco"
+  name <- bind_rows(correlation_edd, correlation_hincfel, correlation_hinctnta, correlation_domicil, correlation_agea, correlation_rlgdgr, correlation_stfeco)
+  name$country <- {{x}}
+  name$p.value <- round(name$p.value, digits = 3)
+  return(name)
+}
+```
+
+
+```{r}
+correlation_Norris <- country_Norris_correlation(ESS18_control, x = "all")
+
+df_at <- country_norris(ESS18_control, cntry, "AT")
+at_correlation <- country_Norris_correlation(df_at, x = "AT")
+
+df_be <- country_norris(ESS18_control, cntry, "BE")
+be_correlation <- country_Norris_correlation(df_be, x = "BE")
+
+df_bg <- country_norris(ESS18_control, cntry, "BG")
+bg_correlation <- country_Norris_correlation(df_bg, x = "BG")
+
+df_ch <- country_norris(ESS18_control, cntry, "CH")
+ch_correlation <- country_Norris_correlation(df_ch, x = "CH")
+
+df_cy <- country_norris(ESS18_control, cntry, "CY")
+cy_correlation <- country_Norris_correlation(df_cy, x = "CY")
+
+df_cz <- country_norris(ESS18_control, cntry, "CZ")
+cz_correlation <- country_Norris_correlation(df_cz, x = "CZ")
+
+df_de <- country_norris(ESS18_control, cntry, "DE")
+de_correlation <- country_Norris_correlation(df_de, x = "DE")
+
+df_ee <- country_norris(ESS18_control, cntry, "EE")
+ee_correlation <- country_Norris_correlation(df_ee, x = "EE")
+
+df_es <- country_norris(ESS18_control, cntry, "ES")
+es_correlation <- country_Norris_correlation(df_es, x = "ES")
+
+df_fi <- country_norris(ESS18_control, cntry, "FI")
+fi_correlation <- country_Norris_correlation(df_fi, x = "FI")
+
+df_fr <- country_norris(ESS18_control, cntry, "FR")
+fr_correlation <- country_Norris_correlation(df_fr, x = "FR")
+
+df_gb <- country_norris(ESS18_control, cntry, "GB")
+gb_correlation <- country_Norris_correlation(df_gb, x = "GB")
+
+df_hr <- country_norris(ESS18_control, cntry, "HR")
+hr_correlation <- country_Norris_correlation(df_hr, x = "HR")
+
+df_hu <- country_norris(ESS18_control, cntry, "HU")
+hu_correlation <- country_Norris_correlation(df_hu, x = "HU")
+
+df_ie <- country_norris(ESS18_control, cntry, "IE")
+ie_correlation <- country_Norris_correlation(df_ie, x = "IE")
+
+df_it <- country_norris(ESS18_control, cntry, "IT")
+it_correlation <- country_Norris_correlation(df_it, x = "IT")
+
+df_lt <- country_norris(ESS18_control, cntry, "LT")
+lt_correlation <- country_Norris_correlation(df_lt, x = "LT")
+
+df_lv <- country_norris(ESS18_control, cntry, "LV")
+lv_correlation <- country_Norris_correlation(df_lv, x = "LV")
+
+df_me <- country_norris(ESS18_control, cntry, "ME")
+me_correlation <- country_Norris_correlation(df_me, x = "ME")
+
+df_nl <- country_norris(ESS18_control, cntry, "NL")
+nl_correlation <- country_Norris_correlation(df_nl, x = "NL")
+
+df_no <- country_norris(ESS18_control, cntry, "NO")
+no_correlation <- country_Norris_correlation(df_no, x = "NO")
+
+df_pl <- country_norris(ESS18_control, cntry, "PL")
+pl_correlation <- country_Norris_correlation(df_pl, x = "PL")
+
+df_pt <- country_norris(ESS18_control, cntry, "PT")
+pt_correlation <- country_Norris_correlation(df_pt, x = "PT")
+
+df_rs <- country_norris(ESS18_control, cntry, "RS")
+rs_correlation <- country_Norris_correlation(df_rs, x = "RS")
+
+df_se <- country_norris(ESS18_control, cntry, "SE")
+se_correlation <- country_Norris_correlation(df_se, x = "SE")
+
+df_si <- country_norris(ESS18_control, cntry, "SI")
+si_correlation <- country_Norris_correlation(df_si, x = "SI")
+
+df_sk <- country_norris(ESS18_control, cntry, "SK")
+sk_correlation <- country_Norris_correlation(df_sk, x = "SK")
+```
+
+```{r}
+correlation_Norris <- bind_rows(correlation_Norris, at_correlation, be_correlation, bg_correlation, ch_correlation, cy_correlation, cz_correlation, de_correlation, ee_correlation, es_correlation, fi_correlation, fr_correlation, gb_correlation, hr_correlation, hu_correlation, ie_correlation, it_correlation, lt_correlation, lv_correlation, me_correlation, nl_correlation, no_correlation, pl_correlation, pt_correlation, rs_correlation, se_correlation, si_correlation, sk_correlation)
+
+```
+
+```{r}
+rm(at_correlation, be_correlation, bg_correlation, ch_correlation, cy_correlation, cz_correlation, de_correlation, ee_correlation, es_correlation, fi_correlation, fr_correlation, gb_correlation, hr_correlation, hu_correlation, ie_correlation, it_correlation, lt_correlation, lv_correlation, me_correlation, nl_correlation, no_correlation, pl_correlation, pt_correlation, rs_correlation, se_correlation, si_correlation, sk_correlation, df_at, df_be, df_bg, df_ch, df_cy, df_cz, df_de, df_ee, df_es, df_fi, df_fr, df_gb, df_hr, df_hu, df_ie, df_it, df_lt, df_lv, df_me, df_nl, df_no, df_pl, df_pt, df_rs, df_se, df_si, df_sk)
+```
+
+Feldman
+```{r}
+country_feldman <- function(df, col_name, value){
+  df <- df%>%
+    filter({{col_name}} == {{value}})
+  return(df)}
+
+country_Feldman_correlation <- function(df, x){
+  correlation_edd <- as.data.frame(wtd.cor(df$Feldman, as.numeric(df$eisced), df$anweight))
+  correlation_edd$variable <- "edd"
+  
+ correlation_hincfel <- as.data.frame(wtd.cor(df$Feldman, as.numeric(df$hincfel), df$anweight))
+correlation_hincfel$variable <- "hincfel"
+
+correlation_hinctnta <- as.data.frame(wtd.cor(df$Feldman, as.numeric(df$hinctnta), df$anweight))
+correlation_hinctnta$variable <- "hinctnta"
+
+  correlation_domicil <- as.data.frame(wtd.cor(df$Feldman, as.numeric(df$domicil), df$anweight))
+  correlation_domicil$variable <- "domicil"
+  correlation_agea <- as.data.frame(wtd.cor(df$Feldman, as.numeric(df$agea), df$anweight))
+  correlation_agea$variable <- "agea"
+  correlation_rlgdgr <- as.data.frame(wtd.cor(df$Feldman, as.numeric(df$rlgdgr), df$anweight))
+  correlation_rlgdgr$variable <- "rlgdgr"
+  correlation_stfeco <- as.data.frame(wtd.cor(df$Feldman, as.numeric(df$stfeco), df$anweight))
+  correlation_stfeco$variable <- "stfeco"
+  name <- bind_rows(correlation_edd, correlation_hincfel, correlation_hinctnta, correlation_domicil, correlation_agea, correlation_rlgdgr, correlation_stfeco)
+  name$country <- {{x}}
+  name$p.value <- round(name$p.value, digits = 3)
+  return(name)
+}
+```
+
+```{r}
+correlation_Feldman <- country_Feldman_correlation(ESS18_control, x = "all")
+
+df_at <- country_feldman(ESS18_control, cntry, "AT")
+at_correlation <- country_Feldman_correlation(df_at, x = "AT")
+
+df_be <- country_feldman(ESS18_control, cntry, "BE")
+be_correlation <- country_Feldman_correlation(df_be, x = "BE")
+
+df_bg <- country_feldman(ESS18_control, cntry, "BG")
+bg_correlation <- country_Feldman_correlation(df_bg, x = "BG")
+
+df_ch <- country_feldman(ESS18_control, cntry, "CH")
+ch_correlation <- country_Feldman_correlation(df_ch, x = "CH")
+
+df_cy <- country_feldman(ESS18_control, cntry, "CY")
+cy_correlation <- country_Feldman_correlation(df_cy, x = "CY")
+
+df_cz <- country_feldman(ESS18_control, cntry, "CZ")
+cz_correlation <- country_Feldman_correlation(df_cz, x = "CZ")
+
+df_de <- country_feldman(ESS18_control, cntry, "DE")
+de_correlation <- country_Feldman_correlation(df_de, x = "DE")
+
+df_ee <- country_feldman(ESS18_control, cntry, "EE")
+ee_correlation <- country_Feldman_correlation(df_ee, x = "EE")
+
+df_es <- country_feldman(ESS18_control, cntry, "ES")
+es_correlation <- country_Feldman_correlation(df_es, x = "ES")
+
+df_fi <- country_feldman(ESS18_control, cntry, "FI")
+fi_correlation <- country_Feldman_correlation(df_fi, x = "FI")
+
+df_fr <- country_feldman(ESS18_control, cntry, "FR")
+fr_correlation <- country_Feldman_correlation(df_fr, x = "FR")
+
+df_gb <- country_feldman(ESS18_control, cntry, "GB")
+gb_correlation <- country_Feldman_correlation(df_gb, x = "GB")
+
+df_hr <- country_feldman(ESS18_control, cntry, "HR")
+hr_correlation <- country_Feldman_correlation(df_hr, x = "HR")
+
+df_hu <- country_feldman(ESS18_control, cntry, "HU")
+hu_correlation <- country_Feldman_correlation(df_hu, x = "HU")
+
+df_ie <- country_feldman(ESS18_control, cntry, "IE")
+ie_correlation <- country_Feldman_correlation(df_ie, x = "IE")
+
+df_it <- country_feldman(ESS18_control, cntry, "IT")
+it_correlation <- country_Feldman_correlation(df_it, x = "IT")
+
+df_lt <- country_feldman(ESS18_control, cntry, "LT")
+lt_correlation <- country_Feldman_correlation(df_lt, x = "LT")
+
+df_lv <- country_feldman(ESS18_control, cntry, "LV")
+lv_correlation <- country_Feldman_correlation(df_lv, x = "LV")
+
+df_me <- country_feldman(ESS18_control, cntry, "ME")
+me_correlation <- country_Feldman_correlation(df_me, x = "ME")
+
+df_nl <- country_feldman(ESS18_control, cntry, "NL")
+nl_correlation <- country_Feldman_correlation(df_nl, x = "NL")
+
+df_no <- country_feldman(ESS18_control, cntry, "NO")
+no_correlation <- country_Feldman_correlation(df_no, x = "NO")
+
+df_pl <- country_feldman(ESS18_control, cntry, "PL")
+pl_correlation <- country_Feldman_correlation(df_pl, x = "PL")
+
+df_pt <- country_feldman(ESS18_control, cntry, "PT")
+pt_correlation <- country_Feldman_correlation(df_pt, x = "PT")
+
+df_rs <- country_feldman(ESS18_control, cntry, "RS")
+rs_correlation <- country_Feldman_correlation(df_rs, x = "RS")
+
+df_se <- country_feldman(ESS18_control, cntry, "SE")
+se_correlation <- country_Feldman_correlation(df_se, x = "SE")
+
+df_si <- country_feldman(ESS18_control, cntry, "SI")
+si_correlation <- country_Feldman_correlation(df_si, x = "SI")
+
+df_sk <- country_feldman(ESS18_control, cntry, "SK")
+sk_correlation <- country_Feldman_correlation(df_sk, x = "SK")
+```
+
+```{r}
+correlation_Feldman <- bind_rows(correlation_Feldman, at_correlation, be_correlation, bg_correlation, ch_correlation, cy_correlation, cz_correlation, de_correlation, ee_correlation, es_correlation, fi_correlation, fr_correlation, gb_correlation, hr_correlation, hu_correlation, ie_correlation, it_correlation, lt_correlation, lv_correlation, me_correlation, nl_correlation, no_correlation, pl_correlation, pt_correlation, rs_correlation, se_correlation, si_correlation, sk_correlation)
+
+```
+
+```{r}
+rm(at_correlation, be_correlation, bg_correlation, ch_correlation, cy_correlation, cz_correlation, de_correlation, ee_correlation, es_correlation, fi_correlation, fr_correlation, gb_correlation, hr_correlation, hu_correlation, ie_correlation, it_correlation, lt_correlation, lv_correlation, me_correlation, nl_correlation, no_correlation, pl_correlation, pt_correlation, rs_correlation, se_correlation, si_correlation, sk_correlation, df_at, df_be, df_bg, df_ch, df_cy, df_cz, df_de, df_ee, df_es, df_fi, df_fr, df_gb, df_hr, df_hu, df_ie, df_it, df_lt, df_lv, df_me, df_nl, df_no, df_pl, df_pt, df_rs, df_se, df_si, df_sk)
+```
+
+```{r}
+lande_fht_all_dir<- function(df){
+
+df$direction[df$variable == "edd" & df$country != "all" & df$correlation > 0] <- TRUE
+df$direction[df$variable == "edd" & df$country != "all" & df$correlation <= 0] <- FALSE
+
+df$direction[df$variable == "hincfel" & df$country != "all" & df$correlation < 0] <- TRUE
+df$direction[df$variable == "hincfel" & df$country != "all" & df$correlation >= 0] <- FALSE
+
+df$direction[df$variable == "hinctnta" & df$country != "all" & df$correlation > 0] <- TRUE
+df$direction[df$variable == "hinctnta" & df$country != "all" & df$correlation <= 0] <- FALSE
+
+df$direction[df$variable == "domicil" & df$country != "all" & df$correlation < 0] <- TRUE
+df$direction[df$variable == "domicil" & df$country != "all" & df$correlation >= 0] <- FALSE
+
+df$direction[df$variable == "agea" & df$country != "all" & df$correlation < 0] <- TRUE
+df$direction[df$variable == "agea" & df$country != "all" & df$correlation >= 0] <- FALSE
+
+df$direction[df$variable == "rlgdgr" & df$country != "all" & df$correlation < 0] <- TRUE
+df$direction[df$variable == "rlgdgr" & df$country != "all" & df$correlation >= 0] <- FALSE
+
+df$direction[df$variable == "stfeco" & df$country != "all" & df$correlation > 0] <- TRUE
+df$direction[df$variable == "stfeco" & df$country != "all" & df$correlation <= 0] <- FALSE
+return(df)
+}
+
+
+lande_fht_all_sig<- function(df){
+df$sig[df$direction == TRUE & df$country != "all" & df$p.value <= 0.05] <- TRUE
+df$sig[df$direction == TRUE & df$country != "all" & df$p.value > 0.05] <- FALSE
+df$sig[df$direction == FALSE] <- FALSE
+
+return(df)
+}
+```
+
+```{r, include=FALSE, echo=FALSE}
+correlation_PVQ <- lande_fht_all_dir(correlation_PVQ)
+correlation_PVQ <- lande_fht_all_sig(correlation_PVQ)
+
+correlation_Norris <- lande_fht_all_dir(correlation_Norris)
+correlation_Norris <- lande_fht_all_sig(correlation_Norris)
+
+correlation_Feldman <- lande_fht_all_dir(correlation_Feldman)
+correlation_Feldman <- lande_fht_all_sig(correlation_Feldman)
+```
+
+```{r}
+correlation_PVQ$aut <- "PVQ"
+  correlation_Norris$aut <- "Norris"
+  correlation_Feldman$aut <- "Feldman"
+  df_aut <- bind_rows(correlation_PVQ, correlation_Norris, correlation_Feldman)
+```
+
+
+```{r}
+aut_dir <- df_aut %>%
+  filter(country != "all") %>%
+  group_by(variable, aut) %>% 
+  tally(direction)
+
+aut_sig <- df_aut %>%
+  filter(country != "all") %>%
+  group_by(variable, aut) %>% 
+  tally(sig)
+
+```
+
+```{r}
+# x is a matrix containing the data
+# method : correlation method. "pearson"" or "spearman"" is supported
+# removeTriangle : remove upper or lower triangle
+# results :  if "html" or "latex"
+  # the results will be displayed in html or latex format
+corstars <-function(x, method=c("pearson", "spearman"), removeTriangle=c("upper", "lower"),
+                     result=c("none", "html", "latex")){
+    #Compute correlation matrix
+    require(Hmisc)
+    x <- as.matrix(x)
+    correlation_matrix<-rcorr(x, type=method[1])
+    R <- correlation_matrix$r # Matrix of correlation coeficients
+    p <- correlation_matrix$P # Matrix of p-value 
+    
+    ## Define notions for significance levels; spacing is important.
+    mystars <- ifelse(p < .0001, "****", ifelse(p < .001, "*** ", ifelse(p < .01, "**  ", ifelse(p < .05, "*   ", "    "))))
+    
+    ## trunctuate the correlation matrix to two decimal
+    R <- format(round(cbind(rep(-1.11, ncol(x)), R), 2))[,-1]
+    
+    ## build a new matrix that includes the correlations with their apropriate stars
+    Rnew <- matrix(paste(R, mystars, sep=""), ncol=ncol(x))
+    diag(Rnew) <- paste(diag(R), " ", sep="")
+    rownames(Rnew) <- colnames(x)
+    colnames(Rnew) <- paste(colnames(x), "", sep="")
+    
+    ## remove upper triangle of correlation matrix
+    if(removeTriangle[1]=="upper"){
+      Rnew <- as.matrix(Rnew)
+      Rnew[upper.tri(Rnew, diag = TRUE)] <- ""
+      Rnew <- as.data.frame(Rnew)
+    }
+    
+    ## remove lower triangle of correlation matrix
+    else if(removeTriangle[1]=="lower"){
+      Rnew <- as.matrix(Rnew)
+      Rnew[lower.tri(Rnew, diag = TRUE)] <- ""
+      Rnew <- as.data.frame(Rnew)
+    }
+    
+    ## remove last column and return the correlation matrix
+    Rnew <- cbind(Rnew[1:length(Rnew)-1])
+    if (result[1]=="none") return(Rnew)
+    else{
+      if(result[1]=="html") print(xtable(Rnew), type="html")
+      else print(xtable(Rnew), type="latex") 
+    }
+} 
+```
+
+
+
+```{r}
+correlation_all <- corstars(subset(ESS18_control, select = c(PVQ, Feldman, Norris)), result = "latex")
+```
+
