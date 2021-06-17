@@ -1,0 +1,130 @@
+---
+title: "Globalisering trussel"
+editor_options: 
+  chunk_output_type: inline
+header-includes:
+    - \usepackage{setspace}\doublespacing
+    - \usepackage{booktabs} 
+    - \usepackage{tabularx}
+    - \usepackage{tidy}
+output:   
+  bookdown::pdf_document2:
+  fig_caption: true
+  fontsize: 10.5pt
+---
+henter pakker
+```{r hente-pakker, message=FALSE, include=FALSE, echo=FALSE}
+library(dplyr) # Kan rense det nye data
+library(tidyr)
+library(stringr) # Til arbejde med string-data
+library(ggplot2) # Til visualisering af resultater
+library(viridis)
+library(lubridate)
+library(ggpubr) # Flere plots sammen
+library(openxlsx) # Kan loade og gemme excel
+library(ggpubr)
+library(tidyverse)
+library(haven) # til at åbne datasæt 
+library(corrr)
+library(psych)
+library(Hmisc)
+Sys.setenv("LANGUAGE"="EN")
+```
+
+#åbne data
+```{r åbne-data, include=FALSE, echo=FALSE}
+MPD2020 <- read.csv("../data/MPD2020 mean states.csv")
+```
+
+
+immigrations relevant variabler
+per108, per110: positiv og negative EU
+per406, per407: positiv og negativ protectionalisme
+per108_c, per110_c: ændringer i positiv og negative EU
+per406_c, per407_c: ændringer i positiv og negativ protectionalisme,
+```{r}
+globalization <- subset(MPD2020, select = c(id, countryname, edate, per108, per110, per406, per407, per108_c, per110_c, per406_c, per407_c, per401, per403, per401_c))
+```
+
+
+```{r}
+globalization <- globalization %>%
+  rowwise()%>%
+  mutate(per10810_sum = sum(per108, per110),
+         per4067_sum = sum(per406, per407),
+         per10810_csum = sum(per108_c, per110_c),
+         per4067_csum = sum(per406_c, per407_c))
+```
+
+```{r}
+globalization.cor <- correlate(subset(globalization, select = c(per10810_sum, per4067_sum)))
+globalization_c.cor <- correlate(subset(globalization, select = c(per10810_csum, per4067_csum)))
+globalization_f.cor <- correlate(subset(globalization, select = c(per108, per110, per406, per407)))
+                                                                  #, per401, per403)))
+globalization_fc.cor <- correlate(subset(globalization, select = c(per108_c, per110_c, per406_c, per407_c)))
+```
+
+```{r}
+globalization_nozero <- globalization %>%
+  filter(per108 > 0, per110 > 0, per406 > 0, per407 > 0)
+```
+
+```{r, message=F, echo=F,include=F}
+globalization_nozero.cor <- correlate(subset(globalization_nozero, select = c(per10810_sum, per4067_sum)))
+globalization_nozero_c.cor <- correlate(subset(globalization_nozero, select = c(per10810_csum, per4067_csum)))
+globalization_nozero_f.cor <- correlate(subset(globalization_nozero, select = c(per108, per110, per406, per407)))
+globalization_nozero_fc.cor <- correlate(subset(globalization_nozero, select = c(per108_c, per110_c, per406_c, per407_c, )))
+```
+
+```{r, message=F, echo=F,include=F}
+globalization <- globalization %>%
+  group_by(countryname)%>%
+  mutate(globalization.cor <-correlate(per10810_sum, per4067_sum))%>%
+  ungroup
+globalization <- globalization %>%
+  rename(globalization.cor = x)%>%
+  select(subset = -c(term))
+```
+
+```{r, message=F, echo=F,include=F}
+globalization <- globalization %>%
+  group_by(countryname)%>%
+  mutate(globalizationpro.cor <-correlate(per406, per407))%>%
+  ungroup
+globalization <- globalization %>%
+  rename(globalizationpro.cor = x)%>%
+  select(subset = -c(term))
+```
+
+```{r, message=F, echo=F,include=F}
+globalization_nozero <- globalization_nozero %>%
+  mutate(globalizationpro.cor <-correlate(per406, per407))%>%
+  ungroup
+globalization_nozero <- globalization_nozero %>%
+  rename(globalizationpro_nozero.cor = x)%>%
+  select(subset = -c(term))
+```
+
+```{r, message=F, echo=F,include=F}
+globalization_nozero <- globalization_nozero %>%
+  mutate(globalizationeu.cor <-correlate(per108, per110))%>%
+  ungroup
+globalization_nozero <- globalization_nozero %>%
+  rename(globalizationeu_nozero.cor = x)%>%
+  select(subset = -c(term))
+```
+
+```{r}
+globalisering.cor <- correlate(subset(globalization, select = c(per401, per406, per407)))
+
+```
+
+```{r}
+corstars(subset(globalization, select = c(per401, per406, per407)), result = "latex")
+```
+
+```{r}
+corstars(subset(globalization, select = c(per401_c, per406_c, per407_c)), result = "latex")
+```
+
+

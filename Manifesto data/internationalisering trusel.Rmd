@@ -1,0 +1,78 @@
+---
+title: "internationalisering trussel"
+editor_options: 
+  chunk_output_type: inline
+header-includes:
+    - \usepackage{setspace}\doublespacing
+    - \usepackage{booktabs} 
+    - \usepackage{tabularx}
+    - \usepackage{tidy}
+output:   
+  bookdown::pdf_document2:
+  fig_caption: true
+  fontsize: 10.5pt
+---
+henter pakker
+```{r hente-pakker, message=FALSE, include=FALSE, echo=FALSE}
+library(dplyr) # Kan rense det nye data
+library(tidyr)
+library(stringr) # Til arbejde med string-data
+library(ggplot2) # Til visualisering af resultater
+library(viridis)
+library(lubridate)
+library(ggpubr) # Flere plots sammen
+library(openxlsx) # Kan loade og gemme excel
+library(ggpubr)
+library(tidyverse)
+library(haven) # til at åbne datasæt 
+library(corrr)
+library(psych)
+library(Hmisc)
+Sys.setenv("LANGUAGE"="EN")
+```
+
+#åbne data
+```{r åbne-data, include=FALSE, echo=FALSE}
+MPD2020 <- read.csv("../data/MPD2020 mean states.csv")
+```
+
+
+```{r}
+international <- subset(MPD2020, select = c(id, countryname, edate, per107, per107_c, per108, per108_c, per109, per109_c, per110, per110_c))
+```
+
+
+```{r}
+international <- international %>%
+  rowwise()%>%
+  mutate(int_sum = sum(per107, per109),
+         eu_sum = sum(per108, per110),
+         int_csum = sum(per107_c, per109_c),
+         eu_csum = sum(per108_c, per110_c),
+         positiv_sum = sum(per107, per108),
+         negativ_sum = sum(per109, per110))
+```
+
+```{r}
+international.cor <- correlate(subset(international, select = c(per107, per109)))
+eu.cor <- correlate(subset(international, select = c(per108, per110)))
+international_c.cor <- correlate(subset(international, select = c(per107_c, per109_c)))
+eu_c.cor <- correlate(subset(international, select = c(per108_c, per110_c)))
+```
+
+
+```{r}
+positiv.cor <- correlate(subset(international, select = c(per107, per108)))
+negativ.cor <- correlate(subset(international, select = c(per109, per110)))
+posneg.cor <- correlate(subset(international, select = c(positiv_sum, negativ_sum)))
+```
+
+
+```{r}
+corstars(subset(international, select = c(positiv_sum, negativ_sum)), result = "latex")
+```
+
+
+```{r}
+corstars(subset(international, select = c(per107, per108)), result = "latex")
+```

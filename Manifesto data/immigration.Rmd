@@ -1,0 +1,163 @@
+---
+title: "immigration trussel"
+editor_options: 
+  chunk_output_type: inline
+header-includes:
+    - \usepackage{setspace}\doublespacing
+    - \usepackage{booktabs} 
+    - \usepackage{tabularx}
+    - \usepackage{tidy}
+output:   
+  bookdown::pdf_document2:
+  fig_caption: true
+  fontsize: 10.5pt
+---
+henter pakker
+```{r hente-pakker, message=FALSE, include=FALSE, echo=FALSE}
+library(dplyr) # Kan rense det nye data
+library(tidyr)
+library(stringr) # Til arbejde med string-data
+library(ggplot2) # Til visualisering af resultater
+library(viridis)
+library(lubridate)
+library(ggpubr) # Flere plots sammen
+library(openxlsx) # Kan loade og gemme excel
+library(ggpubr)
+library(tidyverse)
+library(haven) # til at åbne datasæt 
+library(corrr)
+library(psych)
+library(Hmisc)
+library(xtable)
+Sys.setenv("LANGUAGE"="EN")
+```
+
+#åbne data
+```{r åbne-data, include=FALSE, echo=FALSE}
+MPD2020 <- read.csv("../data/MPD2020 mean states.csv")
+```
+
+
+immigrations relevant variabler
+per601, per602: positiv og negative way of life
+per607, per608: mulitculture, positiv og negativ
+per705: underprivilligede minoritet grupper
+per601_2: immigration negativ - nye immigranter
+per602_2: immigration positivt - nye immigranter
+per607_2:multiculture: immigrant diversitet positiv - er i landet
+per608_2:multiculture: immigrant assimilation - er i landet
+```{r}
+immigration <- subset(MPD2020, select = c(id, countryname, edate, per601, per602, per607, per608, per705, per601_2, per602_2, per607_2, per608_2))
+```
+
+sum af negativ og positiv omtale multiculture immigrant
+```{r}
+immigration$per6078_2sum <- immigration$per607_2 + immigration$per608_2
+immigration$per6078_sum <- immigration$per607 + immigration$per608
+immigration$per6012_sum <- immigration$per601 + immigration$per602
+immigration$per6012_2sum <- immigration$per601_2 + immigration$per602_2
+
+```
+
+
+```{r}
+immigration.cor <- correlate(subset(immigration, select = c(per6078_sum, per6012_sum)))
+immigration_2.cor <- correlate(subset(immigration, select = c(per6078_2sum, per6012_2sum)))
+```
+
+forandring i relevance
+```{r}
+immigration_c <- subset(MPD2020, select = c(id, countryname, per601_c, per602_c, per607_c, per608_c, per705_c, per601_2_c, per602_2_c, per607_2_c, per608_2_c))
+```
+
+sum af negativ og positiv omtale multiculture immigrant
+```{r}
+immigration_c$per6078_2_csum <- immigration_c$per607_2_c + immigration_c$per608_2_c
+immigration_c$per6078_csum <- immigration_c$per607_c + immigration_c$per608_c
+immigration_c$per6012_csum <- immigration_c$per601_c + immigration_c$per602_c
+immigration_c$per6012_2_csum <- immigration_c$per601_2_c + immigration_c$per602_2_c
+
+```
+
+
+```{r}
+immigration_c.cor <- correlate(subset(immigration_c, select = c(per6078_csum, per6012_csum)))
+immigration_c_2.cor <- correlate(subset(immigration_c, select = c(per6078_2_csum, per6012_2_csum)))
+```
+
+```{r}
+immigration <- full_join(immigration, immigration_c)
+```
+
+```{r}
+immigration <- immigration %>%
+  rowwise()%>%
+  mutate(immigration_salience = sum(per6078_2sum + per6012_2sum), ændringer_immigration_salience = sum(per6078_2_csum + per6012_2_csum))
+
+```
+
+
+```{r}
+# x is a matrix containing the data
+# method : correlation method. "pearson"" or "spearman"" is supported
+# removeTriangle : remove upper or lower triangle
+# results :  if "html" or "latex"
+  # the results will be displayed in html or latex format
+corstars <-function(x, method=c("pearson", "spearman"), removeTriangle=c("upper", "lower"),
+                     result=c("none", "html", "latex")){
+    #Compute correlation matrix
+    require(Hmisc)
+    x <- as.matrix(x)
+    correlation_matrix<-rcorr(x, type=method[1])
+    R <- correlation_matrix$r # Matrix of correlation coeficients
+    p <- correlation_matrix$P # Matrix of p-value 
+    
+    ## Define notions for significance levels; spacing is important.
+    mystars <- ifelse(p < .01, "***  ", ifelse(p < .05, "**   ", ifelse(p < .1, "*   ", "    ")))
+    
+    ## trunctuate the correlation matrix to two decimal
+    R <- format(round(cbind(rep(-1.11, ncol(x)), R), 2))[,-1]
+    
+    ## build a new matrix that includes the correlations with their apropriate stars
+    Rnew <- matrix(paste(R, mystars, sep=""), ncol=ncol(x))
+    diag(Rnew) <- paste(diag(R), " ", sep="")
+    rownames(Rnew) <- colnames(x)
+    colnames(Rnew) <- paste(colnames(x), "", sep="")
+    
+    ## remove upper triangle of correlation matrix
+    if(removeTriangle[1]=="upper"){
+      Rnew <- as.matrix(Rnew)
+      Rnew[upper.tri(Rnew, diag = TRUE)] <- ""
+      Rnew <- as.data.frame(Rnew)
+    }
+    
+    ## remove lower triangle of correlation matrix
+    else if(removeTriangle[1]=="lower"){
+      Rnew <- as.matrix(Rnew)
+      Rnew[lower.tri(Rnew, diag = TRUE)] <- ""
+      Rnew <- as.data.frame(Rnew)
+    }
+    
+    ## remove last column and return the correlation matrix
+    Rnew <- cbind(Rnew[1:length(Rnew)-1])
+    if (result[1]=="none") return(Rnew)
+    else{
+      if(result[1]=="html") print(xtable(Rnew), type="html")
+      else print(xtable(Rnew), type="latex") 
+    }
+}
+```
+
+```{r}
+corstars(subset(immigration, select = c(per607_2, per608_2, per601_2, per602_2)), result = "latex")
+```
+
+```{r}
+corstars(subset(immigration, select = c(per607_2_c, per608_2_c, per601_2_c, per602_2_c)), result = "latex")
+```
+
+
+```{r}
+rm(immigration_c)
+```
+

@@ -1,0 +1,138 @@
+---
+title: "Clean data"
+editor_options: 
+  chunk_output_type: inline
+header-includes:
+    - \usepackage{setspace}\doublespacing
+    - \usepackage{booktabs} 
+    - \usepackage{tabularx}
+    - \usepackage{tidy}
+output:   
+  bookdown::pdf_document2:
+  fig_caption: true
+  fontsize: 10.5pt
+---
+henter pakker
+```{r hente-pakker, message=FALSE, include=FALSE, echo=FALSE}
+library(dplyr) # Kan rense det nye data
+library(tidyr)
+library(stringr) # Til arbejde med string-data
+library(ggplot2) # Til visualisering af resultater
+library(viridis)
+library(lubridate)
+library(ggpubr) # Flere plots sammen
+library(openxlsx) # Kan loade og gemme excel
+library(ggpubr)
+library(tidyverse)
+library(haven) # til at åbne datasæt 
+library(corrr)
+library(psych)
+library(Hmisc)
+
+```
+
+#åbne data
+```{r åbne-data, include=FALSE, echo=FALSE}
+MPD2020 <- read_dta("../data/MPDS2020a.dta")
+#.. betyder gå tilabe til parent folder
+```
+
+lave id variable
+```{r}
+MPD2020 <- mutate(MPD2020, id = rownames(MPD2020))
+```
+
+
+#clean data
+slet alt data fra før år 2002, da jeg ikke har survey data fra denen periode
+```{r år 2002 og frem, kun EU lande, include=FALSE, echo=FALSE}
+#først skabe variable - dato, som kun har årstal 
+MPD2020 <- subset(MPD2020, format.Date(edate, "%Y")>"2000")
+
+
+#eu members ku
+MPD2020 <- subset(MPD2020, eumember == 10)
+```
+
+```{r}
+not_all_na <- function(x) {!all(is.na(x))} #funktion, som angive at slette variabler hvor alle observation er NA
+MPD2020 <- MPD2020 %>%
+  select_if(not_all_na)
+
+#drop når alle observation er nul
+not_all_zero <- function(x) {!all(x == 0)} #funktion, som angive at slette variabler hvor alle observation er nul
+MPD2020 <- MPD2020 %>%
+  select_if(not_all_zero)
+
+```
+
+
+
+```{r}
+#adminstraive variable til deres egne dataframe
+MPD2020admin <- subset(MPD2020, select = c(country, countryname, oecdmember, edate, coderid:testeditsim, datasetversion, party, progtype))
+```
+
+
+```{r}
+#variabler der skal lægges sammen
+MPD2020plus <- subset(MPD2020,  select = c(country, countryname, edate, total, pervote))
+
+```
+
+
+```{r}
+#variabler der skal droppes helt fra hoved dataset
+MPD2020 <- subset(MPD2020, select = -c(eumember, voteest:totseats, datasetorigin: corpusversion, id_perm, date, oecdmember, party:testeditsim, datasetversion, progtype, pervote, total))
+```
+
+```{r}
+
+```
+
+
+#lande og valg år gennemsnit på MPD2020 dataframe
+```{r}
+MPD2020 <- MPD2020 %>%
+  group_by(country, countryname, edate)%>%
+  summarise_if(is.numeric, "mean", na.rm =TRUE)
+```
+
+
+```{r}
+MPD2020$id = rownames(MPD2020)
+```
+
+```{r}
+MPD2020plus <- MPD2020plus %>%
+  group_by(country, countryname, edate)%>%
+  summarise_all("sum", na.rm =TRUE)
+```
+
+```{r}
+MPD2020plus$id = rownames(MPD2020plus)
+```
+
+
+#beregne ændring i variable fra sidst indsamlet i det given land
+```{r, message=F, echo=F, include=F}
+MPD2020c <- MPD2020%>% 
+  group_by(country)%>%
+  select(-c(id, idco))%>%
+  mutate_if(is.numeric, funs(.-lag(.)))%>%
+  ungroup
+```
+
+```{r, message=F, echo=F, include=F}
+colnames(MPD2020c) <- paste0(colnames(MPD2020c), "_c")
+MPD2020c$id = rownames(MPD2020c)
+MPD2020c <- subset(MPD2020c, select = -c(country_c, countryname_c, edate_c))
+MPD2020.1 <- full_join(MPD2020, MPD2020c, by = "id")
+```
+
+
+#samle alt i et datasæt
+tager ikke admin med
+```{r}
+MPD2020_f <- full_join(MPD2020.1, MPD2020plus)
+```

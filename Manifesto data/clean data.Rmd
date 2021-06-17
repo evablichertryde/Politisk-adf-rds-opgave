@@ -1,0 +1,361 @@
+---
+title: "Clean data"
+editor_options: 
+  chunk_output_type: inline
+header-includes:
+    - \usepackage{setspace}\doublespacing
+    - \usepackage{booktabs} 
+    - \usepackage{tabularx}
+    - \usepackage{tidy}
+output:   
+  bookdown::pdf_document2:
+  fig_caption: true
+  fontsize: 10.5pt
+---
+henter pakker
+```{r hente-pakker, message=FALSE, include=FALSE, echo=FALSE}
+library(dplyr) # Kan rense det nye data
+library(tidyr)
+library(stringr) # Til arbejde med string-data
+library(ggplot2) # Til visualisering af resultater
+library(viridis)
+library(lubridate)
+library(ggpubr) # Flere plots sammen
+library(openxlsx) # Kan loade og gemme excel
+library(ggpubr)
+library(tidyverse)
+library(haven) # til at åbne datasæt 
+library(corrr)
+library(psych)
+library(Hmisc)
+
+```
+
+#åbne data
+```{r åbne-data, include=FALSE, echo=FALSE}
+MPD2020 <- read_dta("../data/MPDS2020a.dta")
+#.. betyder gå tilabe til parent folder
+```
+
+lave id variable
+```{r}
+MPD2020 <- mutate(MPD2020, id = rownames(MPD2020))
+```
+
+
+#clean data
+slet alt data fra før år 2002, da jeg ikke har survey data fra denen periode
+```{r år 2002 og frem, kun EU lande, include=FALSE, echo=FALSE}
+#først skabe variable - dato, som kun har årstal 
+MPD2020 <- subset(MPD2020, format.Date(edate, "%Y")>"2000")
+
+
+#eu members ku
+MPD2020 <- subset(MPD2020, eumember == 10)
+```
+
+```{r}
+not_all_na <- function(x) {!all(is.na(x))} #funktion, som angive at slette variabler hvor alle observation er NA
+MPD2020 <- MPD2020 %>%
+  select_if(not_all_na)
+
+#drop når alle observation er nul
+not_all_zero <- function(x) {!all(x == 0)} #funktion, som angive at slette variabler hvor alle observation er nul
+MPD2020 <- MPD2020 %>%
+  select_if(not_all_zero)
+
+```
+
+
+
+```{r}
+#adminstraive variable til deres egne dataframe
+MPD2020admin <- subset(MPD2020, select = c(country, countryname, oecdmember, edate, coderid:testeditsim, datasetversion, party, partyname, pervote:progtype))
+```
+
+
+```{r}
+#variabler der skal lægges sammen
+MPD2020plus <- subset(MPD2020,  select = c(country, countryname, edate, total, pervote))
+
+```
+
+
+```{r}
+#variabler der skal droppes helt fra hoved dataset
+MPD2020mean_np <- subset(MPD2020, select = -c(eumember, voteest:totseats, datasetorigin: corpusversion, id_perm, date, oecdmember, party:testeditsim, datasetversion, progtype, total, id))
+```
+
+
+```{r, message=F, include=F, echo=F}
+MPD2020mean_np$pervote[is.na(MPD2020mean_np$pervote)] <- 0
+```
+
+
+#lande og valg år gennemsnit på MPD2020 dataframe
+```{r}
+MPD2020mean_np <- MPD2020mean_np %>%
+  group_by(country, countryname, edate)%>%
+  summarise_if(is.numeric, "mean", na.rm =TRUE)
+```
+
+
+```{r}
+MPD2020mean_np$id = rownames(MPD2020mean_np)
+```
+
+```{r}
+MPD2020plus <- MPD2020plus %>%
+  group_by(country, countryname, edate)%>%
+  summarise_all("sum", na.rm =TRUE)
+```
+
+```{r}
+MPD2020plus$id = rownames(MPD2020plus)
+```
+
+```{r}
+MPD2020plus <- MPD2020plus %>%
+  group_by(country, countryname, edate)%>%
+  summarise_all("sum", na.rm =TRUE)
+```
+
+```{r}
+MPD2020_f <- MPD2020mean_np
+MPD2020_f$pervote <- MPD2020plus$pervote
+MPD2020_f$total <- MPD2020plus$total
+
+```
+
+
+
+#beregne ændring i variable fra sidst indsamlet i det given land
+```{r, message=F, echo=F, include=F}
+MPD2020c <- MPD2020mean_np%>% 
+  group_by(country)%>%
+  select(-c(id, pervote))%>%
+  mutate_if(is.numeric, funs(.-lag(.)))%>%
+  ungroup
+```
+
+```{r, message=F, echo=F, include=F}
+colnames(MPD2020c) <- paste0(colnames(MPD2020c), "_c")
+MPD2020c$id = rownames(MPD2020c)
+MPD2020c <- subset(MPD2020c, select = -c(country_c, countryname_c, edate_c))
+```
+
+
+#samle alt i et datasæt
+tager ikke admin med
+```{r}
+MPD2020_f_np <- full_join(MPD2020_f, MPD2020c)
+```
+
+```{r}
+write.csv(MPD2020_f_np, file="../data/MPD2020 mean states not party.csv")
+```
+
+
+
+immigrations relevant variabler
+per601, per602: positiv og negative way of life
+per607, per608: mulitculture, positiv og negativ
+per705: underprivilligede minoritet grupper
+per601_2: immigration negativ - nye immigranter
+per602_2: immigration positivt - nye immigranter
+per607_2:multiculture: immigrant diversitet positiv - er i landet
+per608_2:multiculture: immigrant assimilation - er i landet
+```{r}
+immigration_np <- subset(MPD2020_f_np, select = c(id, countryname, per601, per602, per607, per608, per705, per601_2, per602_2, per607_2, per608_2))
+```
+
+sum af negativ og positiv omtale multiculture immigrant
+```{r}
+immigration_np$per6078_2sum <- immigration_np$per607_2 + immigration_np$per608_2
+immigration_np$per6078_sum <- immigration_np$per607 + immigration_np$per608
+immigration_np$per6012_sum <- immigration_np$per601 + immigration_np$per602
+immigration_np$per6012_2sum <- immigration_np$per601_2 + immigration_np$per602_2
+
+```
+
+
+```{r}
+immigration_np.cor <- correlate(subset(immigration_np, select = c(per6078_sum, per6012_sum)))
+immigration_np_2.cor <- correlate(subset(immigration_np, select = c(per6078_2sum, per6012_2sum)))
+```
+
+kultural autonomy
+```{r}
+unique(MPD2020$per201)
+unique(MPD2020_f$per201_c)
+
+```
+
+
+
+
+
+```{r}
+traditionel_sweden<- MPD2020_f %>%
+  filter(country==11)%>%
+  mutate(per603_r = 100 - per603)%>%
+  select(id, per603_r, per604, per603, per603_c, per604_c, country)
+```
+
+```{r}
+traditionel_sweden.cor <- correlate(subset(traditionel_sweden, select = -c(country, id)))
+```
+```{r}
+traditionel_fin<- MPD2020_f %>%
+  filter(country==14)%>%
+  mutate(per603_r = 100 - per603)%>%
+  select(id, per603_r, per604, per603, per603_c, per604_c, country)
+```
+
+```{r}
+traditionel_fin.cor <- correlate(subset(traditionel_fin, select = -c(country, id)))
+```
+
+```{r}
+traditionel_fra<- MPD2020_f %>%
+  filter(country==31)%>%
+  mutate(per603_r = 100 - per603)%>%
+  select(id, per603_r, per604, per603, per603_c, per604_c, country)
+```
+
+```{r}
+traditionel_fra.cor <- correlate(subset(traditionel_fra, select = -c(country, id)))
+```
+
+
+```{r}
+alpha(subset(traditionel_sweden, select = c(per603, per604, per603_c, per604_c)))
+```
+
+
+```{r}
+traditionel<- MPD2020_f %>%
+  mutate(per603_r = - per603)%>%
+  select(id, per603_r, per604, country)
+```
+
+```{r}
+traditionel.cor <- correlate(subset(traditionel, select = -c(country, id)))
+```
+
+
+```{r}
+traditional <- correlate(traditionel$per603, traditionel$per604)
+```
+
+
+
+```{r}
+require(plyr)
+tradtionel_correlation_country <- function(traditionel) {
+  return(data.frame(COR = cor(traditionel$per604, traditionel$per603_r)))
+}
+```
+
+```{r}
+traditionel.country <- ddply(traditionel, .(country), tradtionel_correlation_country)
+```
+
+```{r}
+multicultural<- MPD2020_f %>%
+  mutate(per607_r = -per607)%>%
+  select(id, per607_r, per608, country)
+```
+
+```{r}
+require(plyr)
+multicultural_correlation_country <- function(multicultural) {
+  return(data.frame(COR = cor(multicultural$per608, multicultural$per607_r)))
+}
+```
+
+```{r}
+multicultural.country <- ddply(multicultural, .(country), multicultural_correlation_country)
+```
+
+```{r}
+traditionel.multicultural.cor <- correlate(subset(MPD2020_f, select = c(per603, per604, per607, per608)))
+
+```
+
+#åbne original datasæt 
+
+```{r åbne original dataset}
+original <- read_dta("../data/MPDS2020a.dta")
+```
+
+
+```{r}
+traditionel.multicultural.cor <- correlate(subset(MPD2020_f, select = c(per603_c, per604_c, per607_c, per608_c)))
+```
+
+```{r}
+immigration_negative <- correlate(subset(MPD2020_f, select = c(per601_2, per608_2)))
+immigration_negative_change <- correlate(subset(MPD2020_f, select = c(per601_2_c, per608_2_c)))
+immigration_positive <- correlate(subset(MPD2020_f, select = c(per602_2, per607_2)))
+immigration_positive_change <- correlate(subset(MPD2020_f, select = c(per602_2_c, per607_2_c)))
+#                                                        , per607_2, per608_2_c, per608_2, per607, per608, per607_c, per608_c, per602, per602_c, per602_2, per602_2_c)))
+immigration_positive_negative <- correlate(subset(MPD2020_f, select = c(per602_2, per607_2, per601_2, per608_2)))
+immigration_positive_negative_C <- correlate(subset(MPD2020_f, select = c(per602_2_c, per607_2_c, per601_2_c, per608_2_c)))
+
+```
+per607_2_c, per607_2, per608_2_c, per608_2, per607, per608, per607_c, per608_c, per602, per602_c, per602_2, per602_2_c
+
+```{r}
+immigration <- MPD2020_f%>%
+  select(country, countryname, edate, id, per607_2, per608_2_c, per608_2, per607, per608, per607_c, per608_c, per602, per602_c, per602_2, per602_2_c, per601_2_c, per601_2, per601, per601_c, per607_2_c)
+
+immigration$per601_c <- format(immigration$per601_c, scientific = FALSE)
+immigration$per601_c <- as.numeric(immigration$per601_c)
+```
+
+```{r}
+label(immigration$per607_2) <- "multicul +: im diversity"
+label(immigration$per607_2_c) <- "multicul +: im diversity change"
+label(immigration$per608_2) <- "multicul -: im assimilation"
+label(immigration$per608_2_c) <- "multicul -: im assimilation change"
+label(immigration$per607) <- "multicul +"
+label(immigration$per607_c) <- "multicul +: change"
+label(immigration$per608) <- "multicul -"
+label(immigration$per608_c) <- "multicul -: change"
+label(immigration$per602) <- "national way of life -"
+label(immigration$per602_c) <- "national way of life -: change"
+label(immigration$per602_2) <- "national way of life: im +"
+label(immigration$per602_2_c) <- "national way of life: im +: change"
+label(immigration$per601) <- "national way of life +"
+label(immigration$per601_c) <- "national way of life +: change"
+label(immigration$per601_2) <- "national way of life: im -"
+label(immigration$per601_2_c) <- "national way of life: im -: change"
+```
+
+```{r}
+immigration.cor <- (correlate(subset(immigration, select = -c(country, countryname, id))))
+immigration.cor <- round(cor(subset(immigration, select = -c(country, countryname, id)), use="pairwise.complete.obs"), 2)
+immigration.positiv.cor <- round(cor(subset(immigration, select = c(per607_2, per607, per602, per602_2)), use="pairwise.complete.obs"), 2)
+immigration.negativ.cor <- round(cor(subset(immigration, select = c(per608_2, per608, per601, per601_2)), use="pairwise.complete.obs"), 2)
+immigration.positiv.negativ.cor <- round(cor(subset(immigration, select = c(per607_2, per602_2, per608_2, per601_2)), use="pairwise.complete.obs"), 2)
+immigration.positiv.negativ.change.cor <- round(cor(subset(immigration, select = c(per607_2_c, per602_2_c, per608_2_c, per601_2_c)), use="pairwise.complete.obs"), 2)
+```
+
+```{r}
+immigration_simple <- immigration%>%
+  select(country, countryname, id, edate, per602, per601, per602_c, per601_c)%>%
+  mutate(diff_in_im_positive_c = per602_c-per601_c, diff_in_im_positive = per602-per601)
+```
+
+```{r}
+moral <- MPD2020_f%>%
+  select(country, countryname, edate, id, per603, per604, per603_c, per604_c, per503, per503_c, per705, per706, per705_c, per706_c)%>%
+  mutate(diff_in_trad_nega_c = per604_c-per603_c, diff_in_trad_nega = per604-per603)
+```
+
+
+```{r}
+trad.cor <- correlate(subset(moral, select = -c(country, countryname, edate, id)))
+```
+

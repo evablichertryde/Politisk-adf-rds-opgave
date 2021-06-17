@@ -1,0 +1,134 @@
+---
+title: "Klima trussel"
+editor_options: 
+  chunk_output_type: inline
+header-includes:
+    - \usepackage{setspace}\doublespacing
+    - \usepackage{booktabs} 
+    - \usepackage{tabularx}
+    - \usepackage{tidy}
+output:   
+  bookdown::pdf_document2:
+  fig_caption: true
+  fontsize: 10.5pt
+---
+henter pakker
+```{r hente-pakker, message=FALSE, include=FALSE, echo=FALSE}
+library(dplyr) # Kan rense det nye data
+library(tidyr)
+library(stringr) # Til arbejde med string-data
+library(ggplot2) # Til visualisering af resultater
+library(viridis)
+library(lubridate)
+library(ggpubr) # Flere plots sammen
+library(openxlsx) # Kan loade og gemme excel
+library(ggpubr)
+library(tidyverse)
+library(haven) # til at åbne datasæt 
+library(corrr)
+library(psych)
+library(Hmisc)
+library(xtable)
+
+Sys.setenv("LANGUAGE"="EN")
+```
+
+#åbne data
+```{r åbne-data, include=FALSE, echo=FALSE}
+MPD2020 <- read.csv("../data/MPD2020 mean states.csv")
+```
+
+
+```{r}
+klima <- subset(MPD2020, select = c(id, countryname, edate, per501, per501_c, per416_2, per416_2_c))
+```
+
+```{r}
+str(klima$edate)
+```
+
+```{r}
+klima <- klima%>%
+  mutate(edate = as.Date(edate, format = "%Y-%m-%d"))
+```
+
+
+
+```{r}
+klima <- klima %>%
+  rowwise()%>%
+  mutate(sum = sum(per501, per416_2),
+         csum = sum(per501_c, per416_2_c))
+```
+
+```{r}
+klima.cor <- correlate(subset(klima, select = c(per501, per416_2)))
+klima_c.cor <- correlate(subset(klima, select = c(per501_c, per416_2_c)))
+```
+
+
+
+```{r}
+# x is a matrix containing the data
+# method : correlation method. "pearson"" or "spearman"" is supported
+# removeTriangle : remove upper or lower triangle
+# results :  if "html" or "latex"
+  # the results will be displayed in html or latex format
+corstars <-function(x, method=c("pearson", "spearman"), removeTriangle=c("upper", "lower"),
+                     result=c("none", "html", "latex")){
+    #Compute correlation matrix
+    require(Hmisc)
+    x <- as.matrix(x)
+    correlation_matrix<-rcorr(x, type=method[1])
+    R <- correlation_matrix$r # Matrix of correlation coeficients
+    p <- correlation_matrix$P # Matrix of p-value 
+    
+    ## Define notions for significance levels; spacing is important.
+    mystars <- ifelse(p < .0001, "****", ifelse(p < .001, "*** ", ifelse(p < .01, "**  ", ifelse(p < .05, "*   ", "    "))))
+    
+    ## trunctuate the correlation matrix to two decimal
+    R <- format(round(cbind(rep(-1.11, ncol(x)), R), 2))[,-1]
+    
+    ## build a new matrix that includes the correlations with their apropriate stars
+    Rnew <- matrix(paste(R, mystars, sep=""), ncol=ncol(x))
+    diag(Rnew) <- paste(diag(R), " ", sep="")
+    rownames(Rnew) <- colnames(x)
+    colnames(Rnew) <- paste(colnames(x), "", sep="")
+    
+    ## remove upper triangle of correlation matrix
+    if(removeTriangle[1]=="upper"){
+      Rnew <- as.matrix(Rnew)
+      Rnew[upper.tri(Rnew, diag = TRUE)] <- ""
+      Rnew <- as.data.frame(Rnew)
+    }
+    
+    ## remove lower triangle of correlation matrix
+    else if(removeTriangle[1]=="lower"){
+      Rnew <- as.matrix(Rnew)
+      Rnew[lower.tri(Rnew, diag = TRUE)] <- ""
+      Rnew <- as.data.frame(Rnew)
+    }
+    
+    ## remove last column and return the correlation matrix
+    Rnew <- cbind(Rnew[1:length(Rnew)-1])
+    if (result[1]=="none") return(Rnew)
+    else{
+      if(result[1]=="html") print(xtable(Rnew), type="html")
+      else print(xtable(Rnew), type="latex") 
+    }
+} 
+```
+
+O
+```{r}
+corstars(subset(klima, select = c(per501, per416_2)), result = "latex")
+
+```
+```{r}
+corstars(subset(klima, select = c(per501_c, per416_2_c)), result = "latex")
+```
+
+```{r}
+
+```
+
